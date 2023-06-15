@@ -1,0 +1,207 @@
+import: glib("gir/GLib")
+import: gobject("gir/GObject")
+import: json("fmt/json")
+import: uuid("util/uuid")
+import("log/zlog"): log()
+
+:<
+import: game("game")
+let Game := game::game("Test")
+let P1 := game::player("Ann")
+let P2 := game::player("Bob")
+let P3 := game::player("Cat")
+let P4 := game::player("Dan")
+P1 join Game
+P2 join Game
+Game:start
+>:
+
+random::seed(time():nsec)
+
+let Dictionary := with File := file("corncob.txt", "r") do
+	1(set(fun loop susp (while File:read):trim:lower end), File:close)
+end
+
+log::info("Loaded ", count(Dictionary), " words")
+
+export: class: game(:name, :owner, :password, :state, :initfund, :minbid, :round, :players, :countdown, :board,
+	state is enum("Initial", "Starting", "Playing", "Scoring", "Ending"),
+	init is fun(Game, Name, Owner, Password) do
+		Game:name := Name
+		Game:owner := Owner
+		Game:password := Password
+		Game:state := game::state::Initial
+		Game:initfund := 100
+		Game:minbid := 5
+		Game:round := 0
+		Game:players := []
+	end
+)
+
+export: class: player(:name, :callback, :game, :fund, :bid, :hand, :board, :word, :score,
+	init is fun(Player, Name, Callback) do
+		Player:name := Name
+		Player:callback := Callback or fun(Player, Event, Data) do
+			print(Event, " ", Data, "\n")
+		end
+	end
+)
+
+meth :emit(Player: player, [Args]) do
+	Player:callback ! [Player]:grow(Args)
+end
+
+meth :state(Player: player) do
+	if let Game := Player:game then
+		ret {
+			"name" is Game:name, "state" is string(Game:state),
+			"countdown" is Game:countdown, "fund" is Player:fund,
+			"bid" is Player:bid,
+			"word" is Player:word, "score" is Player:score,
+			"owner" is Game:owner = Player and true,
+			"players" is list(Game:players; Other) {
+				"name" is Other:name, "fund" is Other:fund,
+				"self" is Other = Player and true
+			}
+		}
+	end
+end
+
+meth :join(Player: player, Game: game) do
+	Player:game and error("StateError", "Player already in game")
+	Player:game := Game
+	Player:fund := Game:initfund
+	Player:bid := 0
+	Player:hand := nil
+	Player:word := nil
+	for Other in Game:players do
+		Other:emit("game/join", {"name" is Player:name, "fund" is Player:fund})
+	end
+	Game:players:put(Player)
+	ret Player:state
+end
+
+let Games := []
+
+meth :start(Player: player, Game: game) do
+	Game:state != game::state::Initial and error("StateError", "Invalid state")
+	Game:owner != Player and error("StateError", "Invalid owner")
+	Game:state := game::state::Starting
+	Game:countdown := 3
+	for Player in Game:players do
+		Player:fund := Game:initfund
+		Player:emit("round/starting", {"countdown" is Game:countdown})
+	end
+	Games:put(Game)
+end
+
+fun score_word(Word, Board) do
+	def Values := {
+		"a" is 1, "b" is 3, "c" is 3, "d" is 2, "e" is 1, "f" is 4, "g" is 2, "h" is 4,
+		"i" is 1, "j" is 8, "k" is 5, "l" is 1, "m" is 3, "n" is 1, "o" is 1, "p" is 3,
+		"q" is 10, "r" is 1, "s" is 1, "t" is 1, "u" is 1, "v" is 4, "w" is 4, "x" is 8,
+		"y" is 4, "z" is 10
+	}
+	Dictionary[Word] or ret -1
+	let Letters := count2(Word)
+	for Letter, Count in count2(Word) do
+		Count <= Board[Letter] or ret -1
+	end
+	ret last(Word // (0, fun(S, L) (S * 2) + Values[L]))
+end
+
+meth :bid(Player: player, Bid: number) do
+	Player:game:state != game::state::Playing and error("StateError", "Invalid state")
+	Player:bid := Bid max Player:game:minbid min Player:fund
+	ret {"bid" is Player:bid}
+end
+
+meth :word(Player: player, Word: string) do
+	Player:game:state != game::state::Playing and error("StateError", "Invalid state")
+	let Score := score_word(Word, Player:board)
+	if Score > Player:score then
+		Player:score := Score
+		Player:word := Word
+	end
+	ret {"word" is Word, "score" is Score, "bestWord" is Player:word, "bestScore" is Player:score}
+end
+
+let Bag := sum({
+	"a" is 16, "b" is 4, "c" is 6, "d" is 8, "e" is 24, "f" is 4, "g" is 5, "h" is 5,
+	"i" is 13, "j" is 2, "k" is 2, "l" is 7, "m" is 6, "n" is 13, "o" is 15, "p" is 4,
+	"q" is 2, "r" is 13, "s" is 10, "t" is 15, "u" is 7, "v" is 3, "w" is 4, "x" is 2,
+	"y" is 4, "z" is 2
+} =>> fun(L, N) @L limit N)
+
+log::info("Using ", Bag:count, " letters")
+
+glib::timeout_add(0, 1000;) do
+	for Game in Games do
+		ref Countdown := Game:countdown
+		if Countdown and Countdown:dec = 0 then
+			ref State := Game:state
+			let Players := Game:players
+			switch State: game::state
+			case "Starting" do
+				Game:board := list(1 .. 6;) Bag:random
+				State := game::state::Playing
+				Countdown := 60
+				for Player in Players do
+					Player:hand := list(1 .. 3;) Bag:random
+					Player:board := count2(Player:hand & Game:board)
+					Player:bid := Game:minbid min Player:fund
+					Player:word := ""
+					Player:score := 0
+					Player:emit("round/playing", {
+						"countdown" is Countdown, "board" is Game:board,
+						"fund" is Player:fund, "hand" is Player:hand,
+						"bid" is Player:bid
+					})
+				end
+			case "Playing" do
+				State := game::state::Scoring
+				Countdown := 5
+				for Player in Players do
+					Player:emit("round/scoring", {
+						"countdown" is Countdown,
+						"players" is list(Players; Player) {
+							"name" is Player:name,
+							"hand" is Player:hand, "word" is Player:word,
+							"score" is Player:score, "bid" is Player:bid
+						}
+					})
+					Player:fund := old - Player:bid
+				end
+				let Amounts := set([0]):grow(Players, :bid):sort
+				for Prev in Amounts; Next in Amounts skip 1 do
+					let Diff := Next - Prev
+					let Bidders := list(Players ->? fun(Player) Player:bid >= Next)
+					let Max := max(Bidders, :score)
+					let Winners := list(Bidders ->? fun(Player) Player:score = Max)
+					let Prize := Diff * Bidders:count / Winners:count
+					for Player in Winners do
+						Player:fund := old + Prize
+					end
+				end
+			case "Scoring" do
+				State := game::state::Ending
+				Countdown := 3
+				for Player in Players do
+					Player:emit("round/ending", {
+						"countdown" is Countdown,
+						"players" is list(Players; Player) {"fund" is Player:fund}
+					})
+				end
+			case "Ending" do
+				State := game::state::Starting
+				Countdown := 1
+				for Player in Players do
+					Player:emit("round/starting", {"countdown" is Countdown})
+				end
+			end
+		end
+	on Error do
+		log::error(Error)
+	end
+	ret true
+end

@@ -1,0 +1,134 @@
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<meta charset="utf-8"/>
+	<link href="/dragula.min.css" rel="stylesheet" />
+	<style>
+		* {
+			box-sizing: border-box;
+		}
+
+		#logs {
+			white-space: pre-wrap;
+		}
+
+		.letter {
+			width: 2em;
+			height: 2em;
+			display: inline-block;
+			text-align: center;
+			padding-top: 0.5em;
+			border: 2px solid white;
+			background: orange;
+			position: relative;
+		}
+
+		.letter.hand {
+			background: pink;
+		}
+
+		.letter .score {
+			position: absolute;
+			bottom: 0;
+			right: 0.1em;
+			font-size: 50%;
+		}
+
+		.board {
+			width: 18.4em;
+			height: 2.4em;
+			border: 0.2em solid gray;
+			margin: 1em;
+			font-size: 200%;
+			font-weight: bold;
+		}
+
+		#side {
+			margin-left: 1em;
+			font-size: 150%;
+		}
+
+		#summary {
+			font-size: 150%;
+		}
+
+		#summary .word-score {
+			font-weight: bold;
+			color: red;
+		}
+
+		.fund {
+			display: inline-block;
+			background: yellow;
+			transition: all 1s ease;
+			text-align: right;
+		}
+
+		#score-table {
+			position: relative;
+			width: 40em;
+		}
+
+		.score-row {
+			position: absolute;
+			transition: all 1s ease;
+			font-size: 120%;
+		}
+
+		.score-row .name {
+			display: inline-block;
+			width: 6em;
+		}
+
+		.score-row .word {
+			display: inline-block;
+			width: 20em;
+		}
+
+		.score-row .score {
+			display: inline-block;
+			width: 3em;
+		}
+
+		.score-row .bid {
+			display: inline-block;
+			width: 3em;
+			text-align: right;
+		}
+	</style>
+	<script src="/lib.js" type="text/javascript"/>
+</head>
+<body>
+	<dialog id="join-dialog">
+		<table id="join-table"/>
+	</dialog>
+	<dialog id="score-dialog">
+		<div id="score-table"/>
+	</dialog>
+	<div id="controls">
+		<button id="create-button">Create Game</button>
+		<button id="join-button">Join Game</button>
+		<button id="start-button">Start Game</button>
+		<button id="end-button">End Game</button>
+	</div>
+	<div id="main">
+		<table id="side">
+			<thead><tr><th>Player</th><th>Funds</th></tr></thead>
+			<tbody id="players"/>
+		</table>
+		<div id="boards">
+			<div id="game-board" class="board"/>
+			<div id="word-board" class="board"/>
+		</div>
+		<div id="summary">
+			<div id="countdown"/>
+			<div id="word-score"/>
+			<div id="best-score"/>
+			<div>Current Fund: <span id="fund"/> Current Bid: <span id="bid"/></div>
+			<div><input id="current-bid" type="range"/><button id="bid-button"/></div>
+		</div>
+	</div>
+	<div id="logs"/>
+	<script src="/dragula.min.js"/>
+	<script src="/main.js"/>
+</body>
+</html>

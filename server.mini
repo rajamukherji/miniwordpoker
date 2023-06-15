@@ -1,0 +1,174 @@
+#!/usr/local/bin/minilang -g
+import: glib("gir/GLib")
+import: soup("gir/Soup@3.0")
+import: gobject("gir/GObject")
+import: json("fmt/json")
+import: uuid("util/uuid")
+import("log/zlog"): log()
+
+import: game("game")
+
+let Server := soup::Server()
+
+def MimeTypes := {
+	"xhtml" is "application/xhtml+xml",
+	"js" is "text/javascript",
+	"css" is "text/css",
+	"ico" is "image/png"
+}
+
+let serve_static_content := for Arg in Args do
+	until Arg = "--cache-static", fun(Message, Path, MimeType) do
+		log::info('Serving {Path} as {MimeType} with cache')
+		let Content := :({})[Path; Path] do
+			log::info('Reading {Path} into cache')
+			let Channel := glib::IOChannel::new_file(Path, "r")
+			Channel:set_encoding(nil)
+			let (_, Content, Length) := Channel:read_to_end
+			Channel:close
+			Content
+		end
+		Message:set_response(MimeType, soup::MemoryUse::static, Content)
+		Message:set_status(200, nil)
+	on Error do
+		log::error(Error)
+		Message:set_status(404, nil)
+	end
+else
+	fun(Message, Path, MimeType) do
+		log::info('Serving {Path} as {MimeType} without cache')
+		let Channel := glib::IOChannel::new_file(Path, "r")
+		Channel:set_encoding(nil)
+		let (_, Content, Length) := Channel:read_to_end
+		Channel:close
+		Message:set_response(MimeType, soup::MemoryUse::static, Content)
+		Message:set_status(200, nil)
+	on Error do
+		log::error(Error)
+		Message:set_status(404, nil)
+	end
+end
+
+def StaticPath := glib::canonicalize_filename("static", nil)
+
+Server:add_handler("/"; Server, Message, Path, Query, Client) do
+	if Path = "/" then
+		ret serve_static_content(Message, StaticPath + "/index.xhtml", "application/xhtml+xml")
+	else
+		let (_, Extension) := Path */ "."
+		let MimeType := MimeTypes[Extension]
+		if MimeType then
+			let FullPath := glib::canonicalize_filename('{StaticPath}/{Path}', nil)
+			if FullPath:starts(StaticPath) then
+				ret serve_static_content(Message, FullPath, MimeType)
+			end
+		end
+	end
+	Message:set_status(404, nil)
+end
+
+meth :send(Socket: soup::WebsocketConnection, Event: string, Data: any) do
+	Socket:send_message(soup::WebsocketDataType::text, glib::Bytes::new(json::encode({Event is Data})))
+end
+
+let Players := {}
+let Games := {}
+
+fun handle_event(Socket, Player, Event, Data) do
+	switch Event: string
+	case "game/create" do
+		let Id := string(uuid())
+		let Name := Data["name"] or 'game-{Id:before("-")}'
+		let Password := Data["password"] or ""
+		let InitFund := 100
+		let MinBid := 5
+		let Game := Games[Id] := game::game(Name, Player, Password)
+		Socket:send("game/create", {"id" is Id, "name" is Name})
+		Socket:send("game/join", Player:join(Game))
+	case "game/list" do
+		Socket:send("game/list", list(Games => fun(Id, Game) {"id" is Id, "name" is Game:name}))
+	case "game/join" do
+		if let Game := Games[Data["id"]] then
+			let Password := Data["password"] or ""
+			if Password != Game:password then
+				Socket:send("error", "Incorrect password")
+			else
+				Socket:send("game/join", Player:join(Game))
+			end
+		else
+			Socket:send("error", "Invalid action")
+		end
+	case "game/start" do
+		Player:start(Player:game)
+	case "round/bid" do
+		let Bid := Data["bid"] or error("CallError", "Missing parameter bid")
+		Socket:send("round/bid", Player:bid(Bid))
+	case "round/word" do
+		let Word := Data["word"] or error("CallError", "Missing parameter word")
+		Socket:send("round/word", Player:word(Word))
+	end
+on Error do
+	log::error(Error)
+end
+
+fun player_callback(Socket, Player, Event, Data) do
+	log::info(Event, " ", Data)
+	Socket:send(Event, Data)
+on Error do
+	log::error(Error)
+end
+
+Server:add_websocket_handler("/connect", nil, nil; Server, Message, Path, Socket) do
+	let Query := Message:get_uri:get_query
+	let Params := glib::uri_parse_params(Query, Query:length, "&", glib::UriParamsFlags::none)
+	let Id := Params["id"] or string(uuid())
+	let Name := Params["name"] or 'Player-{Id limit 8}'
+	let Player := Players[Id;] game::player(Name)
+	Player:callback := player_callback $ Socket
+	Socket:send("connect", {"id" is Id, "name" is Name})
+	if let Game := Player:game then
+		Socket:send("game/state", Player:state)
+		switch Game:state: game::game::state
+		case "Starting" do
+			Socket:send("round/ending", {
+				"countdown" is Game:countdown,
+				"players" is list(Game:players; Player) {"fund" is Player:fund}
+			})
+		case "Playing" do
+			Socket:send("round/playing", {
+				"countdown" is Game:countdown, "board" is Game:board,
+				"fund" is Player:fund, "hand" is Player:hand,
+				"bid" is Player:bid
+			})
+		case "Scoring" do
+			Socket:send("round/scoring", {
+				"countdown" is Game:countdown,
+				"players" is list(Game:players; Player) {
+					"hand" is Player:hand, "word" is Player:word,
+					"score" is Player:score, "bid" is Player:bid
+				}
+			})
+		case "Ending" do
+			Socket:send("round/ending", {
+				"countdown" is Game:countdown,
+				"players" is list(Players; Player) {"fund" is Player:fund}
+			})
+		end
+	end
+	Socket:connect("message"; Socket, Type, Bytes) do
+		let (Event, Data) := first2(json::decode(Bytes:get_data))
+		log::info("Message: ", Event, " ", Data)
+		handle_event(Socket, Player, Event, Data)
+	on Error do
+		log::error(Error)
+	end
+	Socket:connect("closed"; Socket) do
+		Player:callback := 0
+	end
+on Error do
+	log::error(Error)
+end
+
+log::info("Listening on http://0.0.0.0:8081")
+
+Server:listen_all(8081, nil)
