@@ -239,7 +239,7 @@ events["round/scoring"] = function(data) {
 	let scores = data.players.map((player, i) => {
 		return {
 			score: player.score,
-			element: create("div.score-row", {style: `top:${i * 25}px`},
+			element: create("div.score-row", {style: `top:${i * 35}px`},
 				create("span.name", player.name),
 				create("span.word", renderWord(player.word)),
 				create("span.score", player.score.toString()),
@@ -247,13 +247,13 @@ events["round/scoring"] = function(data) {
 			)
 		};
 	});
-	scoreTable.style.height = (scores.length * 25) + 20 + "px";
+	scoreTable.style.height = (scores.length * 35) + 20 + "px";
 	scoreTable.replaceChildren(scores.map(score => score.element));
 	scoreDialog.showModal();
 	setTimeout(function() {
 		scores.sort((a, b) => b.score - a.score);
 		scores.forEach((score, i) => {
-			score.element.style.top = i * 25 + "px";
+			score.element.style.top = i * 35 + "px";
 		});
 	}, 2000);
 };
