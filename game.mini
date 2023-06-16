@@ -95,6 +95,21 @@ meth :start(Player: player, Game: game) do
 	Games:put(Game)
 end
 
+meth :leave(Player: player, Game: game) do
+	Game = Player:game or error("StateError", "Player not in game")
+	Player:game := nil
+	let Players := Game:players
+	let Index := Players:find(Player)
+	Players:delete(Index)
+	Player:emit("game/leave", {})
+	for Player in Game:players do
+		Player:emit("game/leave", {"player" is Index})
+	end
+	if Players:length = 0 then
+		Games:filter(_ != Game)
+	end
+end
+
 fun score_word(Word, Board) do
 	def Values := {
 		"a" is 1, "b" is 3, "c" is 3, "d" is 2, "e" is 1, "f" is 4, "g" is 2, "h" is 4,

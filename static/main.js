@@ -12,7 +12,7 @@ let bidSpan = document.getElementById("bid");
 let createButton = document.getElementById("create-button");
 let joinButton = document.getElementById("join-button");
 let startButton = document.getElementById("start-button");
-let endButton = document.getElementById("end-button");
+let leaveButton = document.getElementById("leave-button");
 
 let joinDialog = document.getElementById("join-dialog");
 let joinTable = document.getElementById("join-table");
@@ -68,7 +68,7 @@ function send(event, data) {
 window.send = send;
 
 startButton.style.display = "none";
-endButton.style.display = "none";
+leaveButton.style.display = "none";
 
 createButton.onclick = function() {
 	createButton.style.display = "none";
@@ -78,6 +78,7 @@ createButton.onclick = function() {
 
 startButton.onclick = function() {
 	startButton.style.display = "none";
+	leaveButton.style.display = null;
 	send("game/start", {});
 };
 
@@ -87,6 +88,13 @@ joinButton.onclick = function() {
 	joinDialog.showModal();
 	send("game/list", {});
 };
+
+leaveButton.onclick = function() {
+	createButton.style.display = null
+	joinButton.style.display = null;
+	leaveButton.style.display = "none";
+	send("game/leave", {});
+}
 
 events["pong"] = function(data) {
 	lag = (Date.now() - ping) / 2000;
@@ -121,6 +129,7 @@ events["game/join"] = function(data) {
 	if (data.players) {
 		createButton.style.display = "none";
 		joinButton.style.display = "none";
+		leaveButton.style.display = null;
 		let child;
 		while ((child = playersBody.firstChild)) playersBody.removeChild(child);
 		if (data.owner && data.state === "Initial") startButton.style.display = null;
@@ -132,6 +141,7 @@ events["game/join"] = function(data) {
 				create("td", attrs, create("span.fund", {style: `width:${player.fund}px`}, "$" + player.fund.toString()))
 			));
 		});
+		if (data.countdown) countdown = {message: data.state, value: data.countdown};
 	} else {
 		playersBody.appendChild(create("tr",
 			create("td", data.name),
@@ -140,9 +150,27 @@ events["game/join"] = function(data) {
 	}
 };
 
+events["game/leave"] = function(data) {
+	if (data.player) {
+		let rows = playersBody.children;
+		if (rows.length >= data.player) rows[data.player - 1].remove();
+	} else {
+		createButton.style.display = null;
+		joinButton.style.display = null;
+		leaveButton.style.display = "none";
+		startButton.style.display = "none";
+		gameBoard.removeChildren();
+		wordBoard.removeChildren();
+		wordScore.removeChildren();
+		bestScore.removeChildren();
+		playersBody.removeChildren();
+	}
+}
+
 events["game/state"] = function(data) {
 	createButton.style.display = "none";
 	joinButton.style.display = "none";
+	leaveButton.style.display = null;
 	let child;
 	while ((child = playersBody.firstChild)) playersBody.removeChild(child);
 	if (data.owner && data.state === "Initial") startButton.style.display = null;
@@ -177,22 +205,35 @@ const values = {
 	n: 1, o: 1, p: 3, q: 10, r: 1, s: 1, t: 1, u: 1, v: 4, w: 4, x: 8, y: 4, z: 10
 };
 
+function moveLetter(event) {
+	let element = event.currentTarget;
+	if (element.parentNode === gameBoard) {
+		wordBoard.appendChild(element);
+	} else {
+		gameBoard.appendChild(element);
+	}
+	let children = wordBoard.children;
+	let word = "";
+	for (let i = 0; i < children.length; ++i) word += children[i].getAttribute("letter");
+	send("round/word", {word});
+}
+
 events["round/playing"] = function(data) {
-	fundSpan.textContent = data.fund.toString();
+	fundSpan.textContent = "$" + data.fund.toString();
 	data.board.forEach(letter => {
-		gameBoard.appendChild(create("span.letter", {letter},
+		gameBoard.appendChild(create("span.letter", {letter, "on-click": moveLetter},
 			letter.toUpperCase(),
 			create("span.score", values[letter].toString())
 		));
 	});
 	data.hand.forEach(letter => {
-		gameBoard.appendChild(create("span.letter.hand", {letter},
+		gameBoard.appendChild(create("span.letter.hand", {letter, "on-click": moveLetter},
 			letter.toUpperCase(),
 			create("span.score", values[letter].toString())
 		));
 	});
 	bidSpan.textContent = "$" + data.bid.toString();
-	bidButton.textContent = `Change Bid to ${data.bid}`;
+	bidButton.textContent = `Change Bid to $${data.bid}`;
 	currentBid.min = data.bid;
 	currentBid.max = data.fund;
 	currentBid.value = data.bid;
@@ -237,15 +278,27 @@ events["round/bid"] = function(data) {
 events["round/scoring"] = function(data) {
 	countdown = {message: "Scoring", value: data.countdown};
 	let scores = data.players.map((player, i) => {
-		return {
-			score: player.score,
-			element: create("div.score-row", {style: `top:${i * 35}px`},
-				create("span.name", player.name),
-				create("span.word", renderWord(player.word)),
-				create("span.score", player.score.toString()),
-				create("span.bid", "$" + player.bid.toString())
-			)
-		};
+		if (player.word === null) {
+			return {
+				score: -1,
+				element: create("div.score-row", {style: `top:${i * 35}px`},
+					create("span.name", player.name),
+					create("span.word", ""),
+					create("span.score", ""),
+					create("span.bid", "")
+				)
+			};
+		} else {
+			return {
+				score: player.score,
+				element: create("div.score-row", {style: `top:${i * 35}px`},
+					create("span.name", player.name),
+					create("span.word", renderWord(player.word)),
+					create("span.score", player.score.toString()),
+					create("span.bid", "$" + player.bid.toString())
+				)
+			};
+		}
 	});
 	scoreTable.style.height = (scores.length * 35) + 20 + "px";
 	scoreTable.replaceChildren(scores.map(score => score.element));
@@ -266,5 +319,9 @@ events["round/ending"] = function(data) {
 		span.style.width = player.fund + "px";
 	})
 	countdown = {message: "Ending", value: data.countdown};
+	gameBoard.removeChildren();
+	wordBoard.removeChildren();
+	wordScore.removeChildren();
+	bestScore.removeChildren();
 	scoreDialog.close();
 };
