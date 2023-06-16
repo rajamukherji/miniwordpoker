@@ -116,6 +116,7 @@ events["game/list"] = function(data) {
 	data.forEach(game => {
 		joinTable.appendChild(create("tr",
 			create("td", game.name),
+			create("td", game.count.toString() + " players"),
 			create("td", create("button", "Join", {"on-click": function() {
 				joinDialog.close();
 				send("game/join", {id: game.id});

@@ -78,7 +78,7 @@ fun handle_event(Socket, Player, Event, Data) do
 	switch Event: string
 	case "game/create" do
 		let Id := string(uuid())
-		let Name := Data["name"] or 'game-{Id:before("-")}'
+		let Name := ("" != Data["name"]) or 'game-{Id:before("-")}'
 		let Password := Data["password"] or ""
 		let InitFund := 100
 		let MinBid := 5
@@ -86,7 +86,7 @@ fun handle_event(Socket, Player, Event, Data) do
 		Socket:send("game/create", {"id" is Id, "name" is Name})
 		Socket:send("game/join", Player:join(Game))
 	case "game/list" do
-		Socket:send("game/list", list(Games => fun(Id, Game) {"id" is Id, "name" is Game:name}))
+		Socket:send("game/list", list(Games => fun(Id, Game) {"id" is Id, "name" is Game:name, "count" is Game:players:count}))
 	case "game/join" do
 		if let Game := Games[Data["id"]] then
 			let Password := Data["password"] or ""
