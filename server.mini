@@ -142,9 +142,9 @@ Server:add_websocket_handler("/connect", nil, nil; Server, Message, Path, Socket
 			})
 		case "Playing" do
 			Socket:send("round/playing", {
-				"countdown" is Game:countdown, "board" is Game:board,
-				"fund" is Player:fund, "hand" is Player:hand,
-				"bid" is Player:bid
+				"countdown" is Game:countdown, "limit" is Game:limit,
+				"board" is Game:board, "fund" is Player:fund,
+				"hand" is Player:hand, "bid" is Player:bid
 			})
 		case "Scoring" do
 			Socket:send("round/scoring", {
