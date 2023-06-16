@@ -24,7 +24,7 @@ end
 
 log::info("Loaded ", count(Dictionary), " words")
 
-export: class: game(:name, :owner, :password, :state, :initfund, :minbid, :round, :players, :countdown, :board,
+export: class: game(:name, :owner, :password, :state, :initfund, :minbid, :round, :players, :countdown, :limit, :board,
 	state is enum("Initial", "Starting", "Playing", "Scoring", "Ending"),
 	init is fun(Game, Name, Owner, Password) do
 		Game:name := Name
@@ -55,8 +55,8 @@ meth :state(Player: player) do
 	if let Game := Player:game then
 		ret {
 			"name" is Game:name, "state" is string(Game:state),
-			"countdown" is Game:countdown, "fund" is Player:fund,
-			"bid" is Player:bid,
+			"countdown" is Game:countdown, "limit" is Game:limit,
+			"fund" is Player:fund, "bid" is Player:bid,
 			"word" is Player:word, "score" is Player:score,
 			"owner" is Game:owner = Player and true,
 			"players" is list(Game:players; Other) {
@@ -87,10 +87,12 @@ meth :start(Player: player, Game: game) do
 	Game:state != game::state::Initial and error("StateError", "Invalid state")
 	Game:owner != Player and error("StateError", "Invalid owner")
 	Game:state := game::state::Starting
-	Game:countdown := 3
+	Game:countdown := Game:limit := 3
 	for Player in Game:players do
 		Player:fund := Game:initfund
-		Player:emit("round/starting", {"countdown" is Game:countdown})
+		Player:emit("round/starting", {
+			"countdown" is Game:countdown, "limit" is Game:limit
+		})
 	end
 	Games:put(Game)
 end
@@ -161,7 +163,7 @@ glib::timeout_add(0, 1000;) do
 				Game:round:inc
 				Game:board := list(1 .. 6;) Bag:random
 				State := game::state::Playing
-				Countdown := 60
+				Countdown := Game:limit := 60
 				for Player in Players do
 					Player:hand := list(1 .. 3;) Bag:random
 					Player:board := count2(Player:hand & Game:board)
@@ -169,17 +171,18 @@ glib::timeout_add(0, 1000;) do
 					Player:word := ""
 					Player:score := 0
 					Player:emit("round/playing", {
-						"countdown" is Countdown, "board" is Game:board,
+						"countdown" is Countdown, "limit" is Game:limit,
+						"board" is Game:board,
 						"fund" is Player:fund, "hand" is Player:hand,
 						"bid" is Player:bid
 					})
 				end
 			case "Playing" do
 				State := game::state::Scoring
-				Countdown := 5
+				Countdown := Game:limit := 5
 				for Player in Players do
 					Player:emit("round/scoring", {
-						"countdown" is Countdown,
+						"countdown" is Countdown, "limit" is Game:limit,
 						"players" is list(Players; Player) {
 							"name" is Player:name,
 							"hand" is Player:hand, "word" is Player:word,
@@ -201,18 +204,20 @@ glib::timeout_add(0, 1000;) do
 				end
 			case "Scoring" do
 				State := game::state::Ending
-				Countdown := 3
+				Countdown := Game:limit := 3
 				for Player in Players do
 					Player:emit("round/ending", {
-						"countdown" is Countdown,
+						"countdown" is Countdown, "limit" is Game:limit,
 						"players" is list(Players; Player) {"fund" is Player:fund}
 					})
 				end
 			case "Ending" do
 				State := game::state::Starting
-				Countdown := 1
+				Countdown := Game:limit := 1
 				for Player in Players do
-					Player:emit("round/starting", {"countdown" is Countdown})
+					Player:emit("round/starting", {
+						"countdown" is Countdown,  "limit" is Game:limit
+					})
 				end
 				if 2 | Game:round then
 					Game:minbid := old + 5

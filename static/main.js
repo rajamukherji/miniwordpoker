@@ -19,7 +19,8 @@ let joinTable = document.getElementById("join-table");
 let scoreDialog = document.getElementById("score-dialog");
 let scoreTable = document.getElementById("score-table");
 let playersBody = document.getElementById("players");
-let countdownSpan = document.getElementById("countdown");
+let countdownSpan = document.getElementById("countdown-message");
+let countdownProgress = document.getElementById("countdown-progress");
 let countdown;
 
 let currentBid = document.getElementById("current-bid");
@@ -142,7 +143,7 @@ events["game/join"] = function(data) {
 				create("td", attrs, create("span.fund", {style: `width:${player.fund}px`}, "$" + player.fund.toString()))
 			));
 		});
-		if (data.countdown) countdown = {message: data.state, value: data.countdown};
+		if (data.countdown) countdown = {message: data.state, value: data.countdown, limit: data.limit};
 	} else {
 		playersBody.appendChild(create("tr",
 			create("td", data.name),
@@ -187,18 +188,22 @@ events["game/state"] = function(data) {
 	if (data.word) {
 		bestScore.replaceChildren("Current best word is ", create("span.word", data.word), " with ", create("span.score", data.score.toString()), " points.");
 	}
-	if (data.countdown) countdown = {message: data.state, value: data.countdown};
+	if (data.countdown) countdown = {message: data.state, value: data.countdown, limit: data.limit};
 };
 
 setInterval(function() {
-	if (countdown) countdownSpan.textContent = `${countdown.message} for ${countdown.value--}s ...`;
+	if (countdown) {
+		countdownSpan.textContent = `${countdown.message} for ${countdown.value--}s ...`;
+		countdownProgress.max = countdown.limit;
+		countdownProgress.value = countdown.value;
+	}
 }, 1000);
 
 events["round/starting"] = function(data) {
 	let child;
 	while ((child = gameBoard.firstChild)) gameBoard.removeChild(child);
 	while ((child = wordBoard.firstChild)) wordBoard.removeChild(child);
-	countdown = {message: "Starting", value: data.countdown};
+	countdown = {message: "Starting", value: data.countdown, limit: data.limit};
 };
 
 const values = {
@@ -238,7 +243,7 @@ events["round/playing"] = function(data) {
 	currentBid.min = data.bid;
 	currentBid.max = data.fund;
 	currentBid.value = data.bid;
-	countdown = {message: "Playing", value: data.countdown};
+	countdown = {message: "Playing", value: data.countdown, limit: data.limit};
 };
 
 currentBid.oninput = function(event) {
@@ -277,7 +282,7 @@ events["round/bid"] = function(data) {
 };
 
 events["round/scoring"] = function(data) {
-	countdown = {message: "Scoring", value: data.countdown};
+	countdown = {message: "Scoring", value: data.countdown, limit: data.limit};
 	let scores = data.players.map((player, i) => {
 		if (player.word === null) {
 			return {
@@ -319,7 +324,7 @@ events["round/ending"] = function(data) {
 		span.textContent = player.fund.toString();
 		span.style.width = player.fund + "px";
 	})
-	countdown = {message: "Ending", value: data.countdown};
+	countdown = {message: "Ending", value: data.countdown, limit: data.limit};
 	gameBoard.removeChildren();
 	wordBoard.removeChildren();
 	wordScore.removeChildren();
