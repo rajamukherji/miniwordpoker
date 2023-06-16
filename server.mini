@@ -101,7 +101,11 @@ fun handle_event(Socket, Player, Event, Data) do
 	case "game/start" do
 		Player:start(Player:game)
 	case "game/leave" do
-		Player:leave(Player:game)
+		let Game := Player:game
+		Player:leave(Game)
+		if Game:players:count = 0 then
+			Games:delete(for Id, Other in Games do until Other = Game, Id end)
+		end
 	case "round/bid" do
 		let Bid := Data["bid"] or error("CallError", "Missing parameter bid")
 		Socket:send("round/bid", Player:bid(Bid))
