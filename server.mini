@@ -137,7 +137,7 @@ Server:add_websocket_handler("/connect", nil, nil; Server, Message, Path, Socket
 		switch Game:state: game::game::state
 		case "Starting" do
 			Socket:send("round/ending", {
-				"countdown" is Game:countdown,
+				"countdown" is Game:countdown, "limit" is Game:limit,
 				"players" is list(Game:players; Player) {"fund" is Player:fund}
 			})
 		case "Playing" do
@@ -148,15 +148,16 @@ Server:add_websocket_handler("/connect", nil, nil; Server, Message, Path, Socket
 			})
 		case "Scoring" do
 			Socket:send("round/scoring", {
-				"countdown" is Game:countdown,
+				"countdown" is Game:countdown, "limit" is Game:limit,
+				"board" is Game:board,
 				"players" is list(Game:players; Player) {
-					"hand" is Player:hand, "word" is Player:word,
+					"name" is Player:name, "word" is Player:word,
 					"score" is Player:score, "bid" is Player:bid
 				}
 			})
 		case "Ending" do
 			Socket:send("round/ending", {
-				"countdown" is Game:countdown,
+				"countdown" is Game:countdown, "limit" is Game:limit,
 				"players" is list(Players; Player) {"fund" is Player:fund}
 			})
 		end

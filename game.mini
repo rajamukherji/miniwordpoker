@@ -32,7 +32,7 @@ export: class: game(:name, :owner, :password, :state, :initfund, :minbid, :round
 		Game:password := Password
 		Game:state := game::state::Initial
 		Game:initfund := 100
-		Game:minbid := 5
+		Game:minbid := 10
 		Game:round := 0
 		Game:players := []
 	end
@@ -179,13 +179,13 @@ glib::timeout_add(0, 1000;) do
 				end
 			case "Playing" do
 				State := game::state::Scoring
-				Countdown := Game:limit := 5
+				Countdown := Game:limit := 15
 				for Player in Players do
 					Player:emit("round/scoring", {
 						"countdown" is Countdown, "limit" is Game:limit,
+						"board" is Game:board,
 						"players" is list(Players; Player) {
-							"name" is Player:name,
-							"hand" is Player:hand, "word" is Player:word,
+							"name" is Player:name, "word" is Player:word,
 							"score" is Player:score, "bid" is Player:bid
 						}
 					})
@@ -204,7 +204,7 @@ glib::timeout_add(0, 1000;) do
 				end
 			case "Scoring" do
 				State := game::state::Ending
-				Countdown := Game:limit := 3
+				Countdown := Game:limit := 1
 				for Player in Players do
 					Player:emit("round/ending", {
 						"countdown" is Countdown, "limit" is Game:limit,
@@ -213,14 +213,14 @@ glib::timeout_add(0, 1000;) do
 				end
 			case "Ending" do
 				State := game::state::Starting
-				Countdown := Game:limit := 1
+				Countdown := Game:limit := 3
 				for Player in Players do
 					Player:emit("round/starting", {
 						"countdown" is Countdown,  "limit" is Game:limit
 					})
 				end
 				if 2 | Game:round then
-					Game:minbid := old + 5
+					Game:minbid := integer((old * 1.5 + 4) / 5) * 5
 				end
 			end
 		end

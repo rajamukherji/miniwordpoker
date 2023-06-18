@@ -166,6 +166,7 @@ events["game/leave"] = function(data) {
 		wordScore.removeChildren();
 		bestScore.removeChildren();
 		playersBody.removeChildren();
+		countdown = null;
 	}
 }
 
@@ -261,11 +262,21 @@ let drake = dragula([gameBoard, wordBoard], {direction: "horizontal"}).on("shado
 	send("round/word", {word});
 });
 
-function renderWord(word) {
-	return create("span.word", word.split("").map(letter => create("span.letter", {letter},
-		letter.toUpperCase(),
-		create("span.score", values[letter].toString())
-	)));
+function renderWord(word, board) {
+	let counts = {};
+	(board || word.split("")).forEach(letter => { counts[letter] = (counts[letter] || 0) + 1; });
+	return create("span.word", word.split("").map(letter => {
+		let tag = "span.letter";
+		if (counts[letter]) {
+			--counts[letter];
+		} else {
+			tag += ".hand";
+		}
+		return create(tag, {letter},
+			letter.toUpperCase(),
+			create("span.score", values[letter].toString())
+		);
+	}));
 }
 
 events["round/word"] = function(data) {
@@ -287,7 +298,7 @@ events["round/scoring"] = function(data) {
 		if (player.word === null) {
 			return {
 				score: -1,
-				element: create("div.score-row", {style: `top:${i * 35}px`},
+				element: create("div.score-row", {style: `top:${i * 38}px`},
 					create("span.name", player.name),
 					create("span.word", ""),
 					create("span.score", ""),
@@ -297,22 +308,22 @@ events["round/scoring"] = function(data) {
 		} else {
 			return {
 				score: player.score,
-				element: create("div.score-row", {style: `top:${i * 35}px`},
+				element: create("div.score-row", {style: `top:${i * 38}px`},
 					create("span.name", player.name),
-					create("span.word", renderWord(player.word)),
+					create("span.word", renderWord(player.word, data.board)),
 					create("span.score", player.score.toString()),
 					create("span.bid", "$" + player.bid.toString())
 				)
 			};
 		}
 	});
-	scoreTable.style.height = (scores.length * 35) + 20 + "px";
+	scoreTable.style.height = (scores.length * 38) + 20 + "px";
 	scoreTable.replaceChildren(scores.map(score => score.element));
 	scoreDialog.showModal();
 	setTimeout(function() {
 		scores.sort((a, b) => b.score - a.score);
 		scores.forEach((score, i) => {
-			score.element.style.top = i * 35 + "px";
+			score.element.style.top = i * 38 + "px";
 		});
 	}, 2000);
 };

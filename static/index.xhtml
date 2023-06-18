@@ -47,8 +47,8 @@
 		#side {
 			margin-left: 1em;
 			font-size: 150%;
-			float: right;
-			width: 20em;
+			/*float: right;
+			width: 20em;*/
 			overflow: auto;
 		}
 
@@ -88,22 +88,26 @@
 			display: inline-block;
 			width: 6em;
 			font-weight: bold;
+			vertical-align: middle;
 		}
 
 		.score-row > .word {
 			display: inline-block;
 			width: 20em;
+			vertical-align: middle;
 		}
 
 		.score-row > .score {
 			display: inline-block;
 			width: 3em;
+			vertical-align: middle;
 		}
 
 		.score-row > .bid {
 			display: inline-block;
 			width: 3em;
 			text-align: right;
+			vertical-align: middle;
 		}
 
 		#current-bid {
@@ -142,10 +146,6 @@
 		<button id="leave-button">Leave Game</button>
 	</div>
 	<div id="main">
-		<table id="side">
-			<thead><tr><th>Player</th><th>Funds</th></tr></thead>
-			<tbody id="players"/>
-		</table>
 		<div id="boards">
 			<div id="game-board" class="board"/>
 			<div id="word-board" class="board"/>
@@ -160,6 +160,10 @@
 			<div>Current Fund: <span id="fund"/> Current Bid: <span id="bid"/></div>
 			<div><input id="current-bid" type="range"/> <button id="bid-button"/></div>
 		</div>
+		<table id="side">
+			<thead><tr><th>Player</th><th>Funds</th></tr></thead>
+			<tbody id="players"/>
+		</table>
 	</div>
 	<div id="logs"/>
 	<script src="/dragula.min.js"/>
