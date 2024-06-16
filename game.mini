@@ -2,7 +2,7 @@ import: glib("gir/GLib")
 import: gobject("gir/GObject")
 import: json("fmt/json")
 import: uuid("util/uuid")
-import("log/zlog"): log()
+logger: log("main")
 
 :<
 import: game("game")
@@ -124,7 +124,7 @@ fun score_word(Word, Board) do
 	for Letter, Count in count2(Word) do
 		Count <= Board[Letter] or ret -1
 	end
-	ret last(Word // (0, fun(S, L) (S * 2) + Values[L]))
+	ret reduce(0, Word; S, L) (S * 2) + Values[L]
 end
 
 meth :bid(Player: player, Bid: number) do
@@ -179,7 +179,7 @@ glib::timeout_add(0, 1000;) do
 				end
 			case "Playing" do
 				State := game::state::Scoring
-				Countdown := Game:limit := 15
+				Countdown := Game:limit := Players:count + 2
 				for Player in Players do
 					Player:emit("round/scoring", {
 						"countdown" is Countdown, "limit" is Game:limit,

@@ -25,6 +25,7 @@ let countdown;
 
 let currentBid = document.getElementById("current-bid");
 let bidButton = document.getElementById("bid-button");
+let scoreCache = {};
 
 let events = {};
 function connect(callback) {
@@ -205,12 +206,39 @@ events["round/starting"] = function(data) {
 	while ((child = gameBoard.firstChild)) gameBoard.removeChild(child);
 	while ((child = wordBoard.firstChild)) wordBoard.removeChild(child);
 	countdown = {message: "Starting", value: data.countdown, limit: data.limit};
+	scoreCache = {};
 };
 
 const values = {
 	a: 1, b: 3, c: 3, d: 2, e: 1, f: 4, g: 2, h: 4, i: 1, j: 8, k: 5, l: 1, m: 3,
 	n: 1, o: 1, p: 3, q: 10, r: 1, s: 1, t: 1, u: 1, v: 4, w: 4, x: 8, y: 4, z: 10
 };
+
+function scoreWord(word) {
+	if (scoreCache[word] !== undefined) return;
+	send("round/word", {word});
+}
+
+document.onkeydown = function(event) {
+	let letter = event.key;
+	if (letter === "Backspace" || letter === "Delete") {
+		if (wordBoard.lastChild) gameBoard.appendChild(wordBoard.lastChild);
+	} else if (letter === "Escape") {
+		while (wordBoard.firstChild) gameBoard.appendChild(wordBoard.firstChild);
+	} else {
+		let children = gameBoard.children;
+		for (let i = 0; i < children.length; ++i) {
+			if (children[i].getAttribute("letter") === letter) {
+				wordBoard.appendChild(children[i]);
+				let children2 = wordBoard.children;
+				let word = "";
+				for (let i = 0; i < children2.length; ++i) word += children2[i].getAttribute("letter");
+				scoreWord(word);
+				break;
+			}
+		}
+	}
+}
 
 function moveLetter(event) {
 	let element = event.currentTarget;
@@ -222,7 +250,7 @@ function moveLetter(event) {
 	let children = wordBoard.children;
 	let word = "";
 	for (let i = 0; i < children.length; ++i) word += children[i].getAttribute("letter");
-	send("round/word", {word});
+	scoreWord(word);
 }
 
 events["round/playing"] = function(data) {
@@ -259,7 +287,7 @@ let drake = dragula([gameBoard, wordBoard], {direction: "horizontal"}).on("shado
 	let children = wordBoard.children;
 	let word = "";
 	for (let i = 0; i < children.length; ++i) word += children[i].getAttribute("letter");
-	send("round/word", {word});
+	scoreWord(word);
 });
 
 function renderWord(word, board) {
@@ -280,6 +308,7 @@ function renderWord(word, board) {
 }
 
 events["round/word"] = function(data) {
+	scoreCache[data.word] = data.score;
 	if (data.score > 0) {
 		wordScore.replaceChildren(create("span.word", renderWord(data.word)), " is worth ", create("span.word-score", data.score.toString()), " points!");
 	} else {
@@ -325,7 +354,7 @@ events["round/scoring"] = function(data) {
 		scores.forEach((score, i) => {
 			score.element.style.top = i * 38 + "px";
 		});
-	}, 2000);
+	}, 500);
 };
 
 events["round/ending"] = function(data) {

@@ -4,7 +4,7 @@ import: soup("gir/Soup@3.0")
 import: gobject("gir/GObject")
 import: json("fmt/json")
 import: uuid("util/uuid")
-import("log/zlog"): log()
+logger: log("main")
 
 import: game("game")
 
