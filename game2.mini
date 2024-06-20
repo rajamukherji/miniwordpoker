@@ -52,15 +52,19 @@ end
 
 log::info("Loaded ", count(Dictionary), " words")
 
-export: class: game(:name, :owner, :password, :state, :initfund, :minbid, :round, :players, :countdown, :limit, :board,
-	state is enum("Initial", "Starting", "Playing", "Scoring", "Ending"),
+export: class: game(
+	:name, :owner, :password, :state,
+	:initfund, :round, :players, :countdown,
+	:limit, :board, :call, :raise,
+	
+	state is enum("Initial", "Starting", "Playing", "Calling", "Scoring", "Ending"),
 	init is fun(Game, Name, Owner, Password) do
 		Game:name := Name
 		Game:owner := Owner
 		Game:password := Password
 		Game:state := game::state::Initial
 		Game:initfund := 100
-		Game:minbid := 10
+		Game:raise := Game:call := 10
 		Game:round := 0
 		Game:players := []
 	end
@@ -89,7 +93,8 @@ meth :state(Player: player) do
 			"owner" is Game:owner = Player and true,
 			"players" is list(Game:players; Other) {
 				"name" is Other:name, "fund" is Other:fund,
-				"self" is Other = Player and true
+				"self" is Other = Player and true,
+				"bid" is Player:bid
 			}
 		}
 	end
@@ -112,8 +117,8 @@ end
 let Games := []
 
 meth :start(Player: player, Game: game) do
-	Game:state != game::state::Initial and error("StateError", "Invalid state")
-	Game:owner != Player and error("StateError", "Invalid owner")
+	Game:state = game::state::Initial or error("StateError", "Invalid state")
+	Game:owner = Player or error("StateError", "Invalid owner")
 	Game:state := game::state::Starting
 	Game:countdown := Game:limit := 3
 	for Player in Game:players do
@@ -148,9 +153,26 @@ fun check_word(Word, Board) do
 	ret Score
 end
 
-meth :bid(Player: player, Bid: number) do
-	Player:game:state != game::state::Playing and error("StateError", "Invalid state")
-	Player:bid := Bid max Player:game:minbid min Player:fund
+meth :raise(Player: player) do
+	let Game := Player:game
+	Player:game:state = game::state::Playing or error("StateError", "Invalid state")
+	let Bid := Player:bid := (old + Game:raise) min Player:fund
+	let Call := Game:call := old max Bid
+	let Index := Game:players:find(Player)
+	for Player in Game:players do
+		Player:emit("round/raise", {"player" is Index, "bid" is Bid, "call" is Call})
+	end
+	ret {"bid" is Player:bid, "call" is Call}
+end
+
+meth :call(Player: player) do
+	let Game := Player:game
+	Player:game:state = game::state::Playing or Player:game:state = game::state::Calling or error("StateError", "Invalid state")
+	let Bid := Player:bid := Game:call min Player:fund
+	let Index := Game:players:find(Player)
+	for Player in Game:players do
+		Player:emit("round/call", {"player" is Index, "bid" is Bid})
+	end
 	ret {"bid" is Player:bid}
 end
 
@@ -211,21 +233,35 @@ glib::timeout_add(0, 1000;) do
 				for Player in Players do
 					Player:hand := list(1 .. 3;) Bag:random
 					Player:board := count2(Player:hand & Game:board)
-					Player:bid := Game:minbid min Player:fund
+					Player:bid := Game:raise min Player:fund
 					Player:word := ""
 					Player:score := 0
 					Player:emit("round/playing", {
 						"countdown" is Countdown, "limit" is Game:limit,
 						"board" is Game:board,
 						"fund" is Player:fund, "hand" is Player:hand,
-						"bid" is Player:bid
+						"bid" is Player:bid, "raise" is Game:raise
 					})
 				end
 			case "Playing" do
+				State := game::state::Calling
+				Countdown := Game:limit := 10
+				for Player in Players do
+					Player:emit("round/calling", {
+						"countdown" is Countdown, "limit" is Game:limit,
+						"board" is Game:board,
+						"fund" is Player:fund, "hand" is Player:hand,
+						"bid" is Player:bid, "call" is Game:call,
+						"players" is list(Players; Player) {"bid" is Player:bid}
+					})
+				end
+			case "Calling" do
 				State := game::state::Scoring
 				Countdown := Game:limit := Players:count + 2
 				for Player in Players do
 					Player:best := best_word(Player:board)
+				end
+				for Player in Players do
 					Player:emit("round/scoring", {
 						"countdown" is Countdown, "limit" is Game:limit,
 						"board" is Game:board,
@@ -237,17 +273,19 @@ glib::timeout_add(0, 1000;) do
 					})
 					Player:fund := old - Player:bid
 				end
+				let Call := Game:call
 				let Amounts := set([0]):grow(Players, :bid):sort
 				for Prev in Amounts; Next in Amounts skip 1 do
 					let Diff := Next - Prev
 					let Bidders := list(Players ->? fun(Player) Player:bid >= Next)
 					let Max := max(Bidders, :score)
-					let Winners := list(Bidders ->? fun(Player) Player:score = Max)
+					let Winners := list(Bidders ->? fun(Player) Player:score = Max and (Player:fund = 0 or Player:bid = Call))
 					let Prize := Diff * Bidders:count / Winners:count
 					for Player in Winners do
 						Player:fund := old + Prize
 					end
 				end
+				
 			case "Scoring" do
 				State := game::state::Ending
 				Countdown := Game:limit := 1
@@ -266,7 +304,7 @@ glib::timeout_add(0, 1000;) do
 					})
 				end
 				if 2 | Game:round then
-					Game:minbid := integer((old * 1.5 + 4) / 5) * 5
+					Game:raise := integer((old * 1.5 + 4) / 5) * 5
 				end
 			end
 		end

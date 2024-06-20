@@ -6,7 +6,7 @@ import: json("fmt/json")
 import: uuid("util/uuid")
 logger: log("main")
 
-import: game("game")
+import: game("game2")
 
 let Server := soup::Server()
 
@@ -53,7 +53,7 @@ def StaticPath := glib::canonicalize_filename("static", nil)
 
 Server:add_handler("/"; Server, Message, Path, Query, Client) do
 	if Path = "/" then
-		ret serve_static_content(Message, StaticPath + "/index.xhtml", "application/xhtml+xml")
+		ret serve_static_content(Message, StaticPath + "/index2.xhtml", "application/xhtml+xml")
 	else
 		let (_, Extension) := Path */ "."
 		let MimeType := MimeTypes[Extension]
@@ -106,9 +106,10 @@ fun handle_event(Socket, Player, Event, Data) do
 		if Game:players:count = 0 then
 			Games:delete(for Id, Other in Games do until Other = Game, Id end)
 		end
-	case "round/bid" do
-		let Bid := Data["bid"] or error("CallError", "Missing parameter bid")
-		Socket:send("round/bid", Player:bid(Bid))
+	case "round/raise" do
+		Socket:send("round/raise", Player:raise)
+	case "round/call" do
+		Socket:send("round/call", Player:call)
 	case "round/word" do
 		let Word := Data["word"] or error("CallError", "Missing parameter word")
 		Socket:send("round/word", Player:word(Word))
@@ -144,7 +145,15 @@ Server:add_websocket_handler("/connect", nil, nil; Server, Message, Path, Socket
 			Socket:send("round/playing", {
 				"countdown" is Game:countdown, "limit" is Game:limit,
 				"board" is Game:board, "fund" is Player:fund,
-				"hand" is Player:hand, "bid" is Player:bid
+				"hand" is Player:hand, "bid" is Player:bid,
+				"raise" is Game:raise
+			})
+		case "Calling" do
+			Socket:send("round/calling", {
+				"countdown" is Game:countdown, "limit" is Game:limit,
+				"board" is Game:board, "fund" is Player:fund,
+				"hand" is Player:hand, "bid" is Player:bid,
+				"call" is Game:call
 			})
 		case "Scoring" do
 			Socket:send("round/scoring", {

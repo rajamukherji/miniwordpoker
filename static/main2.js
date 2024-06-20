@@ -23,8 +23,8 @@ let countdownSpan = document.getElementById("countdown-message");
 let countdownProgress = document.getElementById("countdown-progress");
 let countdown;
 
-let currentBid = document.getElementById("current-bid");
-let bidButton = document.getElementById("bid-button");
+let raiseButton = document.getElementById("raise-button");
+let callButton = document.getElementById("call-button");
 let scoreCache = {};
 
 let events = {};
@@ -269,19 +269,21 @@ events["round/playing"] = function(data) {
 		));
 	});
 	bidSpan.textContent = "$" + data.bid.toString();
-	bidButton.textContent = `Change Bid to $${data.bid}`;
-	currentBid.min = data.bid;
-	currentBid.max = data.fund;
-	currentBid.value = data.bid;
+	raiseButton.textContent = `Raise $${data.raise}`;
+	callButton.textContent = `Call $${data.raise}`;
 	countdown = {message: "Playing", value: data.countdown, limit: data.limit};
 };
 
-currentBid.oninput = function(event) {
-	bidButton.textContent = `Change Bid to $${currentBid.value}`;
+events["round/calling"] = function(data) {
+	
 }
 
-bidButton.onclick = function(event) {
-	send("round/bid", {bid: parseInt(currentBid.value)});
+raiseButton.onclick = function(event) {
+	send("round/raise", {});
+}
+
+callButton.onclick = function(event) {
+	send("round/call", {});
 }
 
 let drake = dragula([gameBoard, wordBoard], {direction: "horizontal"}).on("shadow", function() {
@@ -308,6 +310,15 @@ function renderWord(word, board) {
 	}));
 }
 
+events["round/raise"] = function(data) {
+	if (!data.player) bidSpan.textContent = "$" + data.bid.toString();
+	callButton.textContent = `Call $${data.call}`;
+};
+
+events["round/call"] = function(data) {
+	if (!data.player) bidSpan.textContent = "$" + data.bid.toString();
+};
+
 events["round/word"] = function(data) {
 	if (data.score > 0) {
 		wordScore.replaceChildren(create("span.word", renderWord(data.word)), " is worth ", create("span.word-score", data.score.toString()), " points!");
@@ -317,8 +328,9 @@ events["round/word"] = function(data) {
 	bestScore.replaceChildren("Current best word is ", create("span.word", renderWord(data.bestWord)), " with ", create("span.word-score", data.bestScore.toString()), " points.");
 };
 
-events["round/bid"] = function(data) {
-	bidSpan.textContent = "$" + data.bid.toString();
+events["round/calling"] = function(data) {
+	countdown = {message: "Calling", value: data.countdown, limit: data.limit};
+	callButton.textContent = `Call $${data.call}`;
 };
 
 events["round/scoring"] = function(data) {
