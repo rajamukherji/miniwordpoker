@@ -230,7 +230,7 @@ glib::timeout_add(0, 1000;) do
 				Game:round:inc
 				Game:board := list(1 .. 6;) Bag:random
 				State := game::state::Playing
-				Countdown := Game:limit := 10
+				Countdown := Game:limit := 60
 				for Player in Players do
 					Player:hand := list(1 .. 3;) Bag:random
 					Player:board := count2(Player:hand & Game:board)
@@ -259,7 +259,7 @@ glib::timeout_add(0, 1000;) do
 				end
 			case "Calling" do
 				State := game::state::Scoring
-				Countdown := Game:limit := Players:count + 200
+				Countdown := Game:limit := Players:count + 2
 				for Player in Players do
 					Player:best := best_word(Player:board{})
 				end
