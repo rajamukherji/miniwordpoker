@@ -186,6 +186,6 @@ on Error do
 	log::error(Error)
 end
 
-log::info("Listening on http://0.0.0.0:999")
+log::info("Listening on http://0.0.0.0:9999")
 
 Server:listen_all(9999, nil)
