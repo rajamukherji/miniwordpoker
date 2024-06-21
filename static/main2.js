@@ -14,6 +14,7 @@ let createButton = document.getElementById("create-button");
 let joinButton = document.getElementById("join-button");
 let startButton = document.getElementById("start-button");
 let leaveButton = document.getElementById("leave-button");
+let clearButton = document.getElementById("clear-button");
 
 let joinDialog = document.getElementById("join-dialog");
 let joinTable = document.getElementById("join-table");
