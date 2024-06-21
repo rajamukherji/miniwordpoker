@@ -160,19 +160,20 @@ meth :raise(Player: player) do
 	let Call := Game:call := old max Bid
 	let Index := Game:players:find(Player)
 	for Player in Game:players do
-		Player:emit("round/raise", {"player" is Index, "bid" is Bid, "call" is Call})
+		:>Player:emit("round/raise", {"player" is Index, "bid" is Bid, "call" is Call})
+		Player:emit("round/raise", {"bid" is Player:bid, "call" is Call, "fund" is Player:fund})
 	end
-	ret {"bid" is Player:bid, "call" is Call}
+	ret {"bid" is Player:bid, "call" is Call, "fund" is Player:fund}
 end
 
 meth :call(Player: player) do
 	let Game := Player:game
-	Player:game:state = game::state::Playing or Player:game:state = game::state::Calling or error("StateError", "Invalid state")
+	Player:game:state = game::state::Calling or error("StateError", "Invalid state")
 	let Bid := Player:bid := Game:call min Player:fund
-	let Index := Game:players:find(Player)
+	:<let Index := Game:players:find(Player)
 	for Player in Game:players do
 		Player:emit("round/call", {"player" is Index, "bid" is Bid})
-	end
+	end>:
 	ret {"bid" is Player:bid}
 end
 
@@ -229,7 +230,7 @@ glib::timeout_add(0, 1000;) do
 				Game:round:inc
 				Game:board := list(1 .. 6;) Bag:random
 				State := game::state::Playing
-				Countdown := Game:limit := 60
+				Countdown := Game:limit := 10
 				for Player in Players do
 					Player:hand := list(1 .. 3;) Bag:random
 					Player:board := count2(Player:hand & Game:board)
@@ -240,7 +241,8 @@ glib::timeout_add(0, 1000;) do
 						"countdown" is Countdown, "limit" is Game:limit,
 						"board" is Game:board,
 						"fund" is Player:fund, "hand" is Player:hand,
-						"bid" is Player:bid, "raise" is Game:raise
+						"bid" is Player:bid, "call" is Game:call, "raise" is Game:raise,
+						"word" is Player:word, "score" is Player:score
 					})
 				end
 			case "Playing" do
@@ -251,38 +253,42 @@ glib::timeout_add(0, 1000;) do
 						"countdown" is Countdown, "limit" is Game:limit,
 						"board" is Game:board,
 						"fund" is Player:fund, "hand" is Player:hand,
-						"bid" is Player:bid, "call" is Game:call,
-						"players" is list(Players; Player) {"bid" is Player:bid}
+						"bid" is Player:bid, "call" is Game:call, "raise" is Game:raise,
+						"word" is Player:word, "score" is Player:score
 					})
 				end
 			case "Calling" do
 				State := game::state::Scoring
-				Countdown := Game:limit := Players:count + 2
+				Countdown := Game:limit := Players:count + 200
 				for Player in Players do
-					Player:best := best_word(Player:board)
+					Player:best := best_word(Player:board{})
 				end
 				for Player in Players do
 					Player:emit("round/scoring", {
 						"countdown" is Countdown, "limit" is Game:limit,
-						"board" is Game:board,
+						"board" is Game:board, "call" is Game:call,
 						"players" is list(Players; Player) {
 							"name" is Player:name, "bid" is Player:bid,
 							"word" is Player:word, "score" is Player:score,
-							"best" is Player:best
+							"best" is Player:best, "fund" is Player:fund
 						}
 					})
 					Player:fund := old - Player:bid
 				end
 				let Call := Game:call
 				let Amounts := set([0]):grow(Players, :bid):sort
+				let Callers := list(Players ->? fun(Player) Player:fund = 0 or Player:bid = Call)
 				for Prev in Amounts; Next in Amounts skip 1 do
 					let Diff := Next - Prev
 					let Bidders := list(Players ->? fun(Player) Player:bid >= Next)
-					let Max := max(Bidders, :score)
-					let Winners := list(Bidders ->? fun(Player) Player:score = Max and (Player:fund = 0 or Player:bid = Call))
-					let Prize := Diff * Bidders:count / Winners:count
-					for Player in Winners do
-						Player:fund := old + Prize
+					let Called := list(Callers ->? fun(Player) Player:bid >= Next)
+					let Max := max(Called, :score)
+					let Winners := list(Called ->? fun(Player) Player:score = Max)
+					if Winners:count > 0 then
+						let Prize := Diff * Bidders:count / Winners:count
+						for Player in Winners do
+							Player:fund := old + Prize
+						end
 					end
 				end
 				
@@ -306,6 +312,7 @@ glib::timeout_add(0, 1000;) do
 				if 2 | Game:round then
 					Game:raise := integer((old * 1.5 + 4) / 5) * 5
 				end
+				Game:call := Game:raise
 			end
 		end
 	on Error do

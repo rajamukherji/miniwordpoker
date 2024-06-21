@@ -62,7 +62,7 @@
 			color: red;
 		}
 
-		#bid, #fund {
+		#bid, #fund, #call {
 			font-weight: bold;
 			color: red;
 		}
@@ -110,6 +110,12 @@
 			vertical-align: middle;
 		}
 		
+		.score-row > .bid.folded {
+			text-decoration: line-through;
+			text-decoration-color: red;
+			text-decoration-thickness: 2px;
+		}
+		
 		.score-row > .best-word {
 			display: inline-block;
 			margin-left: 1em;
@@ -131,6 +137,11 @@
 
 		#bid-button {
 			font-size: 100%;
+		}
+		
+		#bid-button.folding {
+			background: red;
+			color: white;
 		}
 
 		#main {
@@ -173,7 +184,7 @@
 			<div id="word-score"/>
 			<div id="best-score"/>
 			<div>Current Fund: <span id="fund"/></div>
-			<div>Current Bid: <span id="bid"/> <button id="raise-button"/> <button id="call-button"/></div>
+			<div>Current Bid: <span id="bid"/> Call: <span id="call"/> <button id="bid-button"/></div>
 		</div>
 		<table id="side">
 			<thead><tr><th>Player</th><th>Funds</th></tr></thead>

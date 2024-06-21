@@ -8,6 +8,7 @@ let wordScore = document.getElementById("word-score");
 let bestScore = document.getElementById("best-score");
 let fundSpan = document.getElementById("fund");
 let bidSpan = document.getElementById("bid");
+let callSpan = document.getElementById("call");
 
 let createButton = document.getElementById("create-button");
 let joinButton = document.getElementById("join-button");
@@ -23,8 +24,8 @@ let countdownSpan = document.getElementById("countdown-message");
 let countdownProgress = document.getElementById("countdown-progress");
 let countdown;
 
-let raiseButton = document.getElementById("raise-button");
-let callButton = document.getElementById("call-button");
+let bidButton = document.getElementById("bid-button");
+let bidType = "";
 let scoreCache = {};
 
 let events = {};
@@ -96,7 +97,11 @@ leaveButton.onclick = function() {
 	joinButton.style.display = null;
 	leaveButton.style.display = "none";
 	send("game/leave", {});
-}
+};
+
+bidButton.onclick = function(event) {
+	send(`round/${bidType}`, {});
+};
 
 events["pong"] = function(data) {
 	lag = (Date.now() - ping) / 2000;
@@ -171,28 +176,6 @@ events["game/leave"] = function(data) {
 	}
 }
 
-events["game/state"] = function(data) {
-	createButton.style.display = "none";
-	joinButton.style.display = "none";
-	leaveButton.style.display = null;
-	let child;
-	while ((child = playersBody.firstChild)) playersBody.removeChild(child);
-	if (data.owner && data.state === "Initial") startButton.style.display = null;
-	data.players.forEach(player => {
-		let attrs = {};
-		if (player.self) attrs["style"] = "font-weight:bold;color:red;";
-		playersBody.appendChild(create("tr",
-			create("td", attrs, player.name),
-			create("td", attrs, create("span.fund", {style: `width:${player.fund}px`}, "$" + player.fund.toString()))
-		));
-	});
-	if (data.bid) bidSpan.textContent = "$" + data.bid.toString();
-	if (data.word) {
-		bestScore.replaceChildren("Current best word is ", create("span.word", data.word), " with ", create("span.score", data.score.toString()), " points.");
-	}
-	if (data.countdown) countdown = {message: data.state, value: data.countdown, limit: data.limit};
-};
-
 setInterval(function() {
 	if (countdown) {
 		countdownSpan.textContent = `${countdown.message} for ${countdown.value--}s ...`;
@@ -200,14 +183,6 @@ setInterval(function() {
 		countdownProgress.value = countdown.value;
 	}
 }, 1000);
-
-events["round/starting"] = function(data) {
-	let child;
-	while ((child = gameBoard.firstChild)) gameBoard.removeChild(child);
-	while ((child = wordBoard.firstChild)) wordBoard.removeChild(child);
-	countdown = {message: "Starting", value: data.countdown, limit: data.limit};
-	scoreCache = {};
-};
 
 const values = {
 	a: 1, b: 3, c: 3, d: 2, e: 1, f: 4, g: 2, h: 4, i: 1, j: 8, k: 5, l: 1, m: 3,
@@ -254,38 +229,6 @@ function moveLetter(event) {
 	scoreWord(word);
 }
 
-events["round/playing"] = function(data) {
-	fundSpan.textContent = "$" + data.fund.toString();
-	data.board.forEach(letter => {
-		gameBoard.appendChild(create("span.letter", {letter, "on-click": moveLetter},
-			letter.toUpperCase(),
-			create("span.score", values[letter].toString())
-		));
-	});
-	data.hand.forEach(letter => {
-		gameBoard.appendChild(create("span.letter.hand", {letter, "on-click": moveLetter},
-			letter.toUpperCase(),
-			create("span.score", values[letter].toString())
-		));
-	});
-	bidSpan.textContent = "$" + data.bid.toString();
-	raiseButton.textContent = `Raise $${data.raise}`;
-	callButton.textContent = `Call $${data.raise}`;
-	countdown = {message: "Playing", value: data.countdown, limit: data.limit};
-};
-
-events["round/calling"] = function(data) {
-	
-}
-
-raiseButton.onclick = function(event) {
-	send("round/raise", {});
-}
-
-callButton.onclick = function(event) {
-	send("round/call", {});
-}
-
 let drake = dragula([gameBoard, wordBoard], {direction: "horizontal"}).on("shadow", function() {
 	let children = wordBoard.children;
 	let word = "";
@@ -310,13 +253,114 @@ function renderWord(word, board) {
 	}));
 }
 
+events["game/state"] = function(data) {
+	createButton.style.display = "none";
+	joinButton.style.display = "none";
+	leaveButton.style.display = null;
+	let child;
+	while ((child = playersBody.firstChild)) playersBody.removeChild(child);
+	if (data.owner && data.state === "Initial") startButton.style.display = null;
+	data.players.forEach(player => {
+		let attrs = {};
+		if (player.self) attrs["style"] = "font-weight:bold;color:red;";
+		playersBody.appendChild(create("tr",
+			create("td", attrs, player.name),
+			create("td", attrs, create("span.fund", {style: `width:${player.fund}px`}, "$" + player.fund.toString()))
+		));
+	});
+	if (data.bid) bidSpan.textContent = "$" + data.bid.toString();
+	if (data.call !== undefined) {
+		let call = Math.min(data.fund, data.call);
+		bidSpan.textContent = "$" + data.bid.toString();
+		callSpan.textContent = "$" + call.toString();
+		if (data.bid < call) {
+			bidButton.addClass("folding");
+		} else {
+			bidButton.removeClass("folding");
+		}
+	}
+	if (data.state === "Playing") {
+		bidType = "raise";
+		bidButton.textContent = `Raise $${data.raise}`;
+	} else if (data.state === "Calling") {
+		bidType = "call";
+		bidButton.textContent = `Call $${data.call}`;
+	}
+	if (data.word) bestScore.replaceChildren("Current best word is ", create("span.word", renderWord(data.word)), " with ", create("span.score", data.score.toString()), " points.");
+	if (data.countdown) countdown = {message: data.state, value: data.countdown, limit: data.limit};
+};
+
+events["round/starting"] = function(data) {
+	let child;
+	while ((child = gameBoard.firstChild)) gameBoard.removeChild(child);
+	while ((child = wordBoard.firstChild)) wordBoard.removeChild(child);
+	countdown = {message: "Starting", value: data.countdown, limit: data.limit};
+	scoreCache = {};
+};
+
+events["round/playing"] = function(data) {
+	fundSpan.textContent = "$" + data.fund.toString();
+	if (data.hand) {
+		data.board.forEach(letter => {
+			gameBoard.appendChild(create("span.letter", {letter, "on-click": moveLetter},
+				letter.toUpperCase(),
+				create("span.score", values[letter].toString())
+			));
+		});
+		data.hand.forEach(letter => {
+			gameBoard.appendChild(create("span.letter.hand", {letter, "on-click": moveLetter},
+				letter.toUpperCase(),
+				create("span.score", values[letter].toString())
+			));
+		});
+		if (data.word) bestScore.replaceChildren("Current best word is ", create("span.word", renderWord(data.word)), " with ", create("span.word-score", data.score.toString()), " points.");
+		let call = Math.min(data.fund, data.call);
+		bidSpan.textContent = "$" + data.bid.toString();
+		callSpan.textContent = "$" + data.call.toString();
+		bidButton.textContent = `Raise $${data.raise}`;
+		bidButton.removeClass("folding");
+		bidType = "raise";
+		if (data.bid < call) {
+			bidButton.addClass("folding");
+		} else {
+			bidButton.removeClass("folding");
+		}
+	}
+	countdown = {message: "Playing", value: data.countdown, limit: data.limit};
+};
+
+events["round/calling"] = function(data) {
+	fundSpan.textContent = "$" + data.fund.toString();
+	while ((child = gameBoard.firstChild)) gameBoard.removeChild(child);
+	while ((child = wordBoard.firstChild)) wordBoard.removeChild(child);
+	if (data.word) bestScore.replaceChildren("Current best word is ", create("span.word", renderWord(data.word)), " with ", create("span.word-score", data.score.toString()), " points.");
+	let call = Math.min(data.fund, data.call);
+	bidSpan.textContent = "$" + data.bid.toString();
+	callSpan.textContent = "$" + call.toString();
+	bidButton.textContent = `Call $${data.call}`;
+	bidType = "call";
+	if (data.bid < call) {
+		bidButton.addClass("folding");
+	} else {
+		bidButton.removeClass("folding");
+	}
+	countdown = {message: "Calling", value: data.countdown, limit: data.limit};
+}
+
 events["round/raise"] = function(data) {
-	if (!data.player) bidSpan.textContent = "$" + data.bid.toString();
-	callButton.textContent = `Call $${data.call}`;
+	let call = Math.min(data.fund, data.call);
+	bidSpan.textContent = "$" + data.bid.toString();
+	callSpan.textContent = "$" + call.toString();
+	if (data.bid < call) {
+		bidButton.addClass("folding");
+	} else {
+		bidButton.removeClass("folding");
+	}
 };
 
 events["round/call"] = function(data) {
-	if (!data.player) bidSpan.textContent = "$" + data.bid.toString();
+	bidSpan.textContent = "$" + data.bid.toString();
+	bidButton.removeClass("folding");
 };
 
 events["round/word"] = function(data) {
@@ -328,13 +372,9 @@ events["round/word"] = function(data) {
 	bestScore.replaceChildren("Current best word is ", create("span.word", renderWord(data.bestWord)), " with ", create("span.word-score", data.bestScore.toString()), " points.");
 };
 
-events["round/calling"] = function(data) {
-	countdown = {message: "Calling", value: data.countdown, limit: data.limit};
-	callButton.textContent = `Call $${data.call}`;
-};
-
 events["round/scoring"] = function(data) {
 	countdown = {message: "Scoring", value: data.countdown, limit: data.limit};
+	let call = data.call;
 	let scores = data.players.map((player, i) => {
 		if (player.word === null) {
 			return {
@@ -349,13 +389,15 @@ events["round/scoring"] = function(data) {
 				)
 			};
 		} else {
+			let folded = "";
+			if (player.bid < call && player.bid < player.fund) folded = ".folded";
 			return {
 				score: player.score,
 				element: create("div.score-row", {style: `top:${i * 38}px`},
 					create("span.name", player.name),
 					create("span.word", renderWord(player.word, data.board)),
 					create("span.score", player.score.toString()),
-					create("span.bid", "$" + player.bid.toString()),
+					create("span.bid" + folded, "$" + player.bid.toString()),
 					create("span.best-word", renderWord(player.best.word, data.board)),
 					create("span.best-score", player.best.score.toString())
 				)
