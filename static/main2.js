@@ -99,6 +99,10 @@ leaveButton.onclick = function() {
 	send("game/leave", {});
 };
 
+clearButton.onclick = function() {
+	while (wordBoard.firstChild) gameBoard.appendChild(wordBoard.firstChild);
+};
+
 bidButton.onclick = function(event) {
 	send(`round/${bidType}`, {});
 };
