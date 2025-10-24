@@ -1,12 +1,12 @@
-#!/usr/local/bin/minilang -g -L.
+#!/usr/local/bin/minilang -L.
 import: glib("gir/GLib")
-import: soup("gir/Soup@3.0")
 import: gobject("gir/GObject")
+import: soup("gir/Soup@3.0")
 import: json("fmt/json")
 import: uuid("util/uuid")
-logger: log("main")
-
 import: game("game2")
+
+logger: log("main")
 
 let Server := soup::Server()
 
@@ -52,30 +52,29 @@ end
 def StaticPath := glib::canonicalize_filename("static", nil)
 
 Server:add_handler("/"; Server, Message, Path, Query, Client) do
+	log::info('GET ', Path)
 	if Path = "/" then
-		ret serve_static_content(Message, StaticPath + "/index2.xhtml", "application/xhtml+xml")
-	else
-		let (_, Extension) := Path */ "."
-		let MimeType := MimeTypes[Extension]
-		if MimeType then
-			let FullPath := glib::canonicalize_filename('{StaticPath}/{Path}', nil)
-			if FullPath:starts(StaticPath) then
-				ret serve_static_content(Message, FullPath, MimeType)
-			end
+		ret serve_static_content(Message, StaticPath + "/index.xhtml", "application/xhtml+xml")
+	elseif let MimeType := MimeTypes[Path:after(".", -1)] then
+		let FullPath := glib::canonicalize_filename('{StaticPath}/{Path}', nil)
+		if FullPath:starts(StaticPath) then
+			ret serve_static_content(Message, FullPath, MimeType)
 		end
+	on Error do
+		log::error(Error)
 	end
 	Message:set_status(404, nil)
-end
-
-meth :send(Socket: soup::WebsocketConnection, Event: string, Data: any) do
-	Socket:send_message(soup::WebsocketDataType::text, glib::Bytes::new(json::encode({Event is Data})))
 end
 
 let Players := {}
 let Games := {}
 
+fun send_event(Socket, Event, Data) Socket:send_text(json::encode({Event is Data}))
+
 fun handle_event(Socket, Player, Event, Data) do
 	switch Event: string
+	case "ping" do
+		send_event(Socket, "pong")
 	case "game/create" do
 		let Id := string(uuid())
 		let Name := ("" != Data["name"]) or 'game-{Id:before("-")}'
@@ -83,20 +82,20 @@ fun handle_event(Socket, Player, Event, Data) do
 		let InitFund := 100
 		let MinBid := 5
 		let Game := Games[Id] := game::game(Name, Player, Password)
-		Socket:send("game/create", {"id" is Id, "name" is Name})
-		Socket:send("game/join", Player:join(Game))
+		send_event(Socket, "game/create", {"id" is Id, "name" is Name})
+		send_event(Socket, "game/join", Player:join(Game))
 	case "game/list" do
-		Socket:send("game/list", list(Games => fun(Id, Game) {"id" is Id, "name" is Game:name, "count" is Game:players:count}))
+		send_event(Socket, "game/list", list(Games => fun(Id, Game) {"id" is Id, "name" is Game:name, "count" is Game:players:count}))
 	case "game/join" do
 		if let Game := Games[Data["id"]] then
 			let Password := Data["password"] or ""
 			if Password != Game:password then
-				Socket:send("error", "Incorrect password")
+				send_event(Socket, "error", "Incorrect password")
 			else
-				Socket:send("game/join", Player:join(Game))
+				send_event(Socket, "game/join", Player:join(Game))
 			end
 		else
-			Socket:send("error", "Invalid action")
+			send_event(Socket, "error", "Invalid action")
 		end
 	case "game/start" do
 		Player:start(Player:game)
@@ -107,12 +106,12 @@ fun handle_event(Socket, Player, Event, Data) do
 			Games:delete(for Id, Other in Games do until Other = Game, Id end)
 		end
 	case "round/raise" do
-		Socket:send("round/raise", Player:raise)
+		send_event(Socket, "round/raise", Player:raise)
 	case "round/call" do
-		Socket:send("round/call", Player:call)
+		send_event(Socket, "round/call", Player:call)
 	case "round/word" do
 		let Word := Data["word"] or error("CallError", "Missing parameter word")
-		Socket:send("round/word", Player:word(Word))
+		send_event(Socket, "round/word", Player:word(Word))
 	end
 on Error do
 	log::error(Error)
@@ -120,7 +119,7 @@ end
 
 fun player_callback(Socket, Player, Event, Data) do
 	log::info(Event, " ", Data)
-	Socket:send(Event, Data)
+	send_event(Socket, Event, Data)
 on Error do
 	log::error(Error)
 end
@@ -132,31 +131,31 @@ Server:add_websocket_handler("/connect", nil, nil; Server, Message, Path, Socket
 	let Name := Params["name"] or 'Player-{Id limit 8}'
 	let Player := Players[Id;] game::player(Name)
 	Player:callback := player_callback $ Socket
-	Socket:send("connect", {"id" is Id, "name" is Name})
+	send_event(Socket, "connect", {"id" is Id, "name" is Name})
 	if let Game := Player:game then
-		Socket:send("game/state", Player:state)
+		send_event(Socket, "game/state", Player:state)
 		switch Game:state: game::game::state
 		case "Starting" do
-			Socket:send("round/ending", {
+			send_event(Socket, "round/ending", {
 				"countdown" is Game:countdown, "limit" is Game:limit,
 				"players" is list(Game:players; Player) {"fund" is Player:fund}
 			})
 		case "Playing" do
-			Socket:send("round/playing", {
+			send_event(Socket, "round/playing", {
 				"countdown" is Game:countdown, "limit" is Game:limit,
 				"board" is Game:board, "fund" is Player:fund,
 				"hand" is Player:hand, "bid" is Player:bid,
 				"call" is Game:call, "raise" is Game:raise
 			})
 		case "Calling" do
-			Socket:send("round/calling", {
+			send_event(Socket, "round/calling", {
 				"countdown" is Game:countdown, "limit" is Game:limit,
 				"board" is Game:board, "fund" is Player:fund,
 				"hand" is Player:hand, "bid" is Player:bid,
 				"call" is Game:call
 			})
 		case "Scoring" do
-			Socket:send("round/scoring", {
+			send_event(Socket, "round/scoring", {
 				"countdown" is Game:countdown, "limit" is Game:limit,
 				"board" is Game:board, "call" is Game:call,
 				"players" is list(Game:players; Player) {
@@ -166,7 +165,7 @@ Server:add_websocket_handler("/connect", nil, nil; Server, Message, Path, Socket
 				}
 			})
 		case "Ending" do
-			Socket:send("round/ending", {
+			send_event(Socket, "round/ending", {
 				"countdown" is Game:countdown, "limit" is Game:limit,
 				"players" is list(Players; Player) {"fund" is Player:fund}
 			})
@@ -174,7 +173,7 @@ Server:add_websocket_handler("/connect", nil, nil; Server, Message, Path, Socket
 	end
 	Socket:connect("message"; Socket, Type, Bytes) do
 		let (Event, Data) := first2(json::decode(Bytes:get_data))
-		log::info("Message: ", Event, " ", Data)
+		:>log::info("Message: ", Event, " ", Data)
 		handle_event(Socket, Player, Event, Data)
 	on Error do
 		log::error(Error)
@@ -184,8 +183,11 @@ Server:add_websocket_handler("/connect", nil, nil; Server, Message, Path, Socket
 	end
 on Error do
 	log::error(Error)
+	Socket:close(soup::WebsocketCloseCode::server_error, string(Error))
 end
 
-log::info("Listening on http://0.0.0.0:9999")
+log::info("Listening on http://0.0.0.0:8081")
 
-Server:listen_all(9999, nil)
+Server:listen_all(8081, nil)
+
+callcc(0)

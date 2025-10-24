@@ -30,7 +30,7 @@ end
 
 let Dictionary := {}
 
-with File := file('{import}/corncob.txt', "r") do
+with File := file('{import}/dictionary.txt', "r") do
 	loop
 		let Word := (while File:read):trim:lower
 		do
