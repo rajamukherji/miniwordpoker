@@ -144,14 +144,14 @@ events["game/join"] = function(data) {
 			if (player.self) attrs["style"] = "font-weight:bold;color:red;";
 			playersBody.appendChild(create("tr",
 				create("td", attrs, player.name),
-				create("td", attrs, create("span.points", {style: `width:${player.points}px`}, "$" + player.points.toString()))
+				create("td", attrs, create("span.points", {style: `width:${player.points}px`}, player.points.toString()))
 			));
 		});
 		if (data.countdown) countdown = {message: data.state, value: data.countdown, limit: data.limit};
 	} else {
 		playersBody.appendChild(create("tr",
 			create("td", data.name),
-			create("td", create("span.points", {style: `width:${data.points}px`}, "$" + data.points.toString()))
+			create("td", create("span.points", {style: `width:${data.points}px`}, data.points.toString()))
 		));
 	}
 };
