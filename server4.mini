@@ -4,7 +4,7 @@ import: gobject("gir/GObject")
 import: soup("gir/Soup@3.0")
 import: json("fmt/json")
 import: uuid("util/uuid")
-import: game("game2")
+import: game("game4")
 
 logger: log("main")
 
@@ -54,7 +54,7 @@ def StaticPath := glib::canonicalize_filename("static", nil)
 Server:add_handler("/"; Server, Message, Path, Query, Client) do
 	log::info('GET ', Path)
 	if Path = "/" then
-		ret serve_static_content(Message, StaticPath + "/index2.xhtml", "application/xhtml+xml")
+		ret serve_static_content(Message, StaticPath + "/index4.xhtml", "application/xhtml+xml")
 	elseif let MimeType := MimeTypes[Path:after(".", -1)] then
 		let FullPath := glib::canonicalize_filename('{StaticPath}/{Path}', nil)
 		if FullPath:starts(StaticPath) then
@@ -79,8 +79,6 @@ fun handle_event(Socket, Player, Event, Data) do
 		let Id := string(uuid())
 		let Name := ("" != Data["name"]) or 'game-{Id:before("-")}'
 		let Password := Data["password"] or ""
-		let InitFund := 100
-		let MinBid := 5
 		let Game := Games[Id] := game::game(Name, Player, Password)
 		send_event(Socket, "game/create", {"id" is Id, "name" is Name})
 		send_event(Socket, "game/join", Player:join(Game))
@@ -105,13 +103,8 @@ fun handle_event(Socket, Player, Event, Data) do
 		if Game:players:count = 0 then
 			Games:delete(for Id, Other in Games do until Other = Game, Id end)
 		end
-	case "round/raise" do
-		send_event(Socket, "round/raise", Player:raise)
-	case "round/call" do
-		send_event(Socket, "round/call", Player:call)
-	case "round/word" do
-		let Word := Data["word"] or error("CallError", "Missing parameter word")
-		send_event(Socket, "round/word", Player:word(Word))
+	case "round/choose" do
+		send_event(Socket, "round/choose", Player:choose(Data["choice"]))
 	end
 on Error do
 	log::error(Error)
@@ -134,40 +127,48 @@ Server:add_websocket_handler("/connect", nil, nil; Server, Message, Path, Socket
 	send_event(Socket, "connect", {"id" is Id, "name" is Name})
 	if let Game := Player:game then
 		send_event(Socket, "game/state", Player:state)
+		send_event(Socket, "game/history", Game:history)
 		switch Game:state: game::game::state
 		case "Starting" do
 			send_event(Socket, "round/ending", {
 				"countdown" is Game:countdown, "limit" is Game:limit,
-				"players" is list(Game:players; Player) {"fund" is Player:fund}
+				"players" is list(Game:players; Player) {
+					"points" is Player:points
+				}
 			})
-		case "Playing" do
-			send_event(Socket, "round/playing", {
+		case "Running" do
+			send_event(Socket, "round/running", {
 				"countdown" is Game:countdown, "limit" is Game:limit,
-				"board" is Game:board, "fund" is Player:fund,
-				"hand" is Player:hand, "bid" is Player:bid,
-				"call" is Game:call, "raise" is Game:raise
+				"points" is Player:points, "rate" is Player:rate,
+				"players" is list(Game:players; Player) {
+					"points" is Player:points, "rate" is Player:rate
+				}
 			})
-		case "Calling" do
-			send_event(Socket, "round/calling", {
+		case "Choosing" do
+			send_event(Socket, "round/choosing", {
 				"countdown" is Game:countdown, "limit" is Game:limit,
-				"board" is Game:board, "fund" is Player:fund,
-				"hand" is Player:hand, "bid" is Player:bid,
-				"call" is Game:call
+				"points" is Player:points, "rate" is Player:rate,
+				"choices" is list(Player:choices; Choice) {
+					"name" is Choice:name,
+					"description" is Choice:description,
+					"cost" is Choice:cost(Player)
+				},
+				"players" is list(Game:players; Player) {
+					"points" is Player:points, "rate" is Player:rate
+				}
 			})
 		case "Scoring" do
 			send_event(Socket, "round/scoring", {
 				"countdown" is Game:countdown, "limit" is Game:limit,
-				"board" is Game:board, "call" is Game:call,
 				"players" is list(Game:players; Player) {
-					"name" is Player:name, "bid" is Player:bid,
-					"word" is Player:word, "score" is Player:score,
-					"best" is Player:best, "fund" is Player:fund
+					"name" is Player:name, "choices" is Player:history,
+					"points" is Player:points, "rate" is Player:rate
 				}
 			})
 		case "Ending" do
 			send_event(Socket, "round/ending", {
 				"countdown" is Game:countdown, "limit" is Game:limit,
-				"players" is list(Players; Player) {"fund" is Player:fund}
+				"players" is list(Players; Player) {"points" is Player:points}
 			})
 		end
 	end

@@ -1,0 +1,176 @@
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<meta charset="utf-8"/>
+	<link href="/dragula.min.css" rel="stylesheet" />
+	<style>
+		* {
+			box-sizing: border-box;
+		}
+
+		#logs {
+			white-space: pre-wrap;
+		}
+
+		#choices {
+			width: 46em;
+			height: 16em;
+			border: 0.2em solid gray;
+			margin: 1em;
+			display: flex;
+		}
+
+		.choice {
+			margin: 1em;
+			border: 0.2em solid gray;
+			height: 14em;
+			width: 10em;
+		}
+
+		.choice .name {
+			font-weight: bold;
+			text-align: center;
+			border-bottom: 0.2em solid gray;
+			height: 2em;
+		}
+
+		.choice .description {
+			height: 10em;
+		}
+
+		.choice .cost {
+			font-weight: bold;
+			text-align: center;
+			border-top: 0.2em solid gray;
+			height: 2em;
+		}
+
+		.choice.selected {
+			border: 0.2em solid red;
+		}
+
+		.choice.selected .name {
+			border-bottom: 0.2em solid red;
+		}
+
+		.choice.selected .cost {
+			border-top: 0.2em solid red;
+		}
+
+		#side {
+			margin-left: 1em;
+			font-size: 150%;
+			/*float: right;
+			width: 20em;*/
+			overflow: auto;
+		}
+
+		#summary {
+			font-size: 150%;
+			line-height: 1.5em;
+		}
+
+		#summary .word-score {
+			font-weight: bold;
+			color: red;
+		}
+
+		.points {
+			display: inline-block;
+			background: yellow;
+			transition: all 1s ease;
+		}
+
+		#score-table {
+			position: relative;
+			width: 65em;
+		}
+
+		#score-table .score-row {
+			position: absolute;
+			transition: all 1s ease;
+			font-size: 120%;
+		}
+
+		.score-row > .name {
+			display: inline-block;
+			width: 6em;
+			font-weight: bold;
+			vertical-align: middle;
+		}
+
+		.score-row > .points {
+			display: inline-block;
+			width: 3em;
+			text-align: right;
+			vertical-align: middle;
+		}
+
+		#current-points {
+			width: 20em;
+		}
+
+		#main {
+			margin: 2em;
+		}
+
+		#display {
+			display: flex;
+			flex-direction: row;
+		}
+
+		#history {
+			padding: 1em;
+			border: 3px double black;
+			width: 100%;
+			font-size: 80%;
+			height: 20em;
+			overflow: auto;
+		}
+
+		th {
+			text-align: left;
+		}
+
+		th, td {
+			padding: 0.25em;
+		}
+	</style>
+	<script src="/lib.js" type="text/javascript"/>
+</head>
+<body>
+	<dialog id="join-dialog">
+		<table id="join-table"/>
+	</dialog>
+	<dialog id="score-dialog">
+		<div id="score-table"/>
+	</dialog>
+	<dialog id="choices-dialog">
+		<div id="choices"/>
+	</dialog>
+	<div id="controls">
+		<button id="create-button">Create Game</button>
+		<button id="join-button">Join Game</button>
+		<button id="start-button">Start Game</button>
+		<button id="leave-button">Leave Game</button>
+	</div>
+	<div id="main">
+		<div id="display">
+			<div id="history"/>
+		</div>
+		<div id="summary">
+			<div id="countdown">
+				<span id="countdown-message"/>
+				<progress id="countdown-progress"/>
+			</div>
+			<div>Current Points: <span id="points"/></div>
+			<div>Current Rate: <span id="rate"/></div>
+		</div>
+		<table id="side">
+			<thead><tr><th>Player</th><th>Points</th></tr></thead>
+			<tbody id="players"/>
+		</table>
+	</div>
+	<div id="logs"/>
+	<script src="/main4.js"/>
+</body>
+</html>

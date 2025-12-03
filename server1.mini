@@ -54,7 +54,7 @@ def StaticPath := glib::canonicalize_filename("static", nil)
 Server:add_handler("/"; Server, Message, Path, Query, Client) do
 	log::info('GET ', Path)
 	if Path = "/" then
-		ret serve_static_content(Message, StaticPath + "/index.xhtml", "application/xhtml+xml")
+		ret serve_static_content(Message, StaticPath + "/index1.xhtml", "application/xhtml+xml")
 	elseif let MimeType := MimeTypes[Path:after(".", -1)] then
 		let FullPath := glib::canonicalize_filename('{StaticPath}/{Path}', nil)
 		if FullPath:starts(StaticPath) then

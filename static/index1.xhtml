@@ -1,0 +1,187 @@
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<meta charset="utf-8"/>
+	<link href="/dragula.min.css" rel="stylesheet" />
+	<style>
+		* {
+			box-sizing: border-box;
+		}
+
+		#logs {
+			white-space: pre-wrap;
+		}
+
+		.letter {
+			width: 2em;
+			height: 2em;
+			display: inline-block;
+			text-align: center;
+			padding-top: 0.5em;
+			border: 2px solid white;
+			background: orange;
+			position: relative;
+			line-height: 0.7em;
+			font-weight: bold;
+			box-shadow: 0 0 0 0.075em inset black;
+		}
+
+		.letter.hand {
+			background: pink;
+		}
+
+		.letter .score {
+			position: absolute;
+			bottom: 0;
+			right: 0.2em;
+			font-size: 50%;
+		}
+
+		.board {
+			width: 18.4em;
+			height: 2.4em;
+			border: 0.2em solid gray;
+			margin: 1em;
+			font-size: 200%;
+		}
+
+		#side {
+			margin-left: 1em;
+			font-size: 150%;
+			/*float: right;
+			width: 20em;*/
+			overflow: auto;
+		}
+
+		#summary {
+			font-size: 150%;
+			line-height: 1.5em;
+		}
+
+		#summary .word-score {
+			font-weight: bold;
+			color: red;
+		}
+
+		#bid, #fund {
+			font-weight: bold;
+			color: red;
+		}
+
+		.fund {
+			display: inline-block;
+			background: yellow;
+			transition: all 1s ease;
+		}
+
+		#score-table {
+			position: relative;
+			width: 65em;
+		}
+
+		.score-row {
+			position: absolute;
+			transition: all 1s ease;
+			font-size: 120%;
+		}
+
+		.score-row > .name {
+			display: inline-block;
+			width: 6em;
+			font-weight: bold;
+			vertical-align: middle;
+		}
+
+		.score-row > .word {
+			display: inline-block;
+			width: 20em;
+			vertical-align: middle;
+		}
+
+		.score-row > .score {
+			display: inline-block;
+			width: 3em;
+			vertical-align: middle;
+		}
+
+		.score-row > .bid {
+			display: inline-block;
+			width: 3em;
+			text-align: right;
+			vertical-align: middle;
+		}
+		
+		.score-row > .best-word {
+			display: inline-block;
+			margin-left: 1em;
+			font-size: 80%;
+			width: 20em;
+			vertical-align: middle;
+		}
+
+		.score-row > .best-score {
+			display: inline-block;
+			font-size: 80%;
+			width: 3em;
+			vertical-align: middle;
+		}
+
+		#current-bid {
+			width: 20em;
+		}
+
+		#bid-button {
+			font-size: 100%;
+		}
+
+		#main {
+			margin: 2em;
+		}
+
+		th {
+			text-align: left;
+		}
+
+		th, td {
+			padding: 0.25em;
+		}
+	</style>
+	<script src="/lib.js" type="text/javascript"/>
+</head>
+<body>
+	<dialog id="join-dialog">
+		<table id="join-table"/>
+	</dialog>
+	<dialog id="score-dialog">
+		<div id="score-table"/>
+	</dialog>
+	<div id="controls">
+		<button id="create-button">Create Game</button>
+		<button id="join-button">Join Game</button>
+		<button id="start-button">Start Game</button>
+		<button id="leave-button">Leave Game</button>
+	</div>
+	<div id="main">
+		<div id="boards">
+			<div id="game-board" class="board"/>
+			<div id="word-board" class="board"/>
+		</div>
+		<div id="summary">
+			<div id="countdown">
+				<span id="countdown-message"/>
+				<progress id="countdown-progress"/>
+			</div>
+			<div id="word-score"/>
+			<div id="best-score"/>
+			<div>Current Fund: <span id="fund"/> Current Bid: <span id="bid"/></div>
+			<div><input id="current-bid" type="range"/> <button id="bid-button"/></div>
+		</div>
+		<table id="side">
+			<thead><tr><th>Player</th><th>Funds</th></tr></thead>
+			<tbody id="players"/>
+		</table>
+	</div>
+	<div id="logs"/>
+	<script src="/dragula.min.js"/>
+	<script src="/main.js"/>
+</body>
+</html>
