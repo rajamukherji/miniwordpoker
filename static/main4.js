@@ -209,7 +209,9 @@ events["round/running"] = function(data) {
 	historyDiv.appendChild(create("h3", `Round ${data.round}`));
 	historyDiv.appendChild(create("hr"));
 	if (data.log) data.log.forEach(log => {
-		historyDiv.appendChild(create("div", {"class": "log"}, log));
+		let entry = create("div", {"class": "log"});
+		entry.innerHTML = log;
+		historyDiv.appendChild(entry);
 	});
 	if (pointsInterval == null) pointsInterval = setInterval(() => {
 		data.players.forEach((player, i) => {

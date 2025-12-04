@@ -101,7 +101,7 @@ end
 class: adjust_words(choice, :price, :change)
 meth :name(Choice: adjust_words) '{change_verb(Choice:change)} Words'
 meth :image(Choice: adjust_words) "buy_words"
-meth :description(Choice: adjust_words) 'Change own words to {Choice:change}'
+meth :description(Choice: adjust_words) '{change_verb(Choice:change)} words by {math::abs(Choice:change)}'
 meth :cost(Choice: adjust_words) '{Choice:price} dictionaries'
 meth :apply(Choice: adjust_words, Player: player) do
 	Player:dictionaries := old - Choice:price
