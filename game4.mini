@@ -124,12 +124,14 @@ meth :apply(Choice: steal_points, Player: player) do
 	ret '{Player:name} stole {Choice:change} points from {Choice:with:name}'
 end
 
-class: unique_choice(choice, :players)
+class: unique_choice(choice, :reward, :penalty)
 meth :name(Choice: unique_choice) "Choose Wisely"
 meth :description(Choice: unique_choice) 'If only you choose this option then {Choice:reward:description}, otherwise {Choice:penalty:description}'
 meth :cost(Choice: unique_choice) "Free?"
 meth :apply(Choice: unique_choice, Player: player) do
-	if count(Choice:players -> :choice ->? (_ = Choice)) > 1 then
+	let Players := Player:game:players
+	let Index := Player:choices:find(Choice)
+	if count(Players ->? fun(Other) Other:choice = Other:choices[Index]) > 1 then
 		Choice:penalty:apply(Player)
 	else
 		Choice:reward:apply(Player)
@@ -166,19 +168,9 @@ meth :leave(Player: player, Game: game) do
 	end
 end
 
-meth :choose(Player: player, Index: integer) do
-	if Index then
-		let Choice := Player:choices[Index]
-		if Choice:cost(Player) then
-			Player:choice := Choice
-			ret true
-		else
-			ret false
-		end
-	else
-		Player:choice := nil
-		ret true
-	end
+meth :choose(Player: player, Index: any) do
+	Player:choice := Player:choices[Index{}]
+	ret true
 end
 
 def Points := polynomial("Points")
@@ -236,12 +228,9 @@ glib::timeout_add(0, 1000;) do
 					let Choice := switch nil: random
 					case 0.2 do
 						let A1 := switch nil: random
-						case 5 do 1
+						case 10 do 1
 						case 2 do 1.1
 						case 1 do 1.2
-						case 0.5 do 1.3
-						case 0.2 do 1.4
-						case 0.1 do 1.5
 						end
 						let B1 := round_points(MeanPoints * random(real) / 2)
 						let A2 := switch nil: random
@@ -254,16 +243,13 @@ glib::timeout_add(0, 1000;) do
 							Player:choices:put(adjust_points(
 								A2 * Player:rate + B2,
 								A1 * Player:points + B1
-							)
+							))
 						end
 					case 0.3 do
 						let A1 := switch nil: random
-						case 5 do 1
+						case 10 do 1
 						case 2 do 1.1
 						case 1 do 1.2
-						case 0.5 do 1.3
-						case 0.2 do 1.4
-						case 0.1 do 1.5
 						end
 						let B1 := random(0 .. 5)
 						let A2 := switch nil: random
@@ -271,12 +257,12 @@ glib::timeout_add(0, 1000;) do
 						case 1 do 0.1
 						case 0.2 do 0.2
 						end
-						let B2 := MeanPoints * random(0 .. 2) / 2
+						let B2 := MeanPoints * random(1 .. 3) / 4
 						for Player in Players do
 							Player:choices:put(adjust_rate(
 								A2 * Player:points + B2,
 								A1 * Player:rate + B1
-							)
+							))
 						end
 					case 0.1 do
 						let Best := max2(dup(Players), :points)[1]
@@ -297,31 +283,38 @@ glib::timeout_add(0, 1000;) do
 						end
 					case 0.1 do
 						let A1 := switch nil: random
-						case 5 do 1.2
+						case 10 do 1.2
 						case 2 do 1.3
 						case 1 do 1.4
-						case 0.5 do 1.5
-						case 0.2 do 1.6
-						case 0.1 do 1.7
 						end
 						let B1 := round_points(MeanPoints * random(real))
 						let A2 := switch nil: random
-						case 5 do 0.8
+						case 10 do 0.8
 						case 2 do 0.7
 						case 1 do 0.6
-						case 0.5 do 0.5
-						case 0.2 do 0.4
-						case 0.1 do 0.3
 						end
 						let B2 := round_points(-MeanPoints * random(real) / 2)
-						let Choice := unique_choice(
 						for Player in Players do
-							
+							Player:choices:put(unique_choice(
+								adjust_points(0, A1 * Player:points + B1),
+								adjust_points(0, A2 * Player:points + B2)
+							))
+						end
+					case 0.1 do
+						let Change := MeanPoints * random(1 .. 3) / 4
+						let Others := list(Players):shuffle
+						for Player in Players; Other in Others do
+							let Choice := steal_points(Other, Change)
+							Player:choices:put(Choice)
+						end
+					case 0.1 do
+						let Others := list(Players):shuffle
+						for Player in Players; Other in Others do
+							Player:choices:put(swap_points(Other))
 						end
 					end
 				end
 				for Player in Players do
-					Player:choices := Choices
 					Player:choice := nil
 					Player:emit("round/choosing", {
 						"countdown" is Countdown, "limit" is Game:limit,
