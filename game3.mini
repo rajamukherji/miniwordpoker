@@ -225,17 +225,25 @@ glib::timeout_add(0, 1000;) do
 				State := game::state::Playing
 				Countdown := Game:limit := 60
 				for Player in Players do
-					let Board := Player:board
-					for Swap in Player:swap do
-						Board:delete(Board:find(Swap){})
+					if let Board := Player:board then
+						for Swap in Player:swap do
+							Board:delete(Board:find(Swap){})
+						end
+						Board:grow(Board:length ..< 9;) Bag:random
+						Player:emit("round/playing", {
+							"countdown" is Countdown, "limit" is Game:limit,
+							"board" is Player:board,
+							"points" is Player:points,
+							"word" is Player:word, "score" is Player:score
+						})
+					else
+						Player:emit("round/playing", {
+							"countdown" is Countdown, "limit" is Game:limit,
+							"board" is [],
+							"points" is Player:points,
+							"word" is "", "score" is 0
+						})
 					end
-					Board:grow(Board:length ..< 9;) Bag:random
-					Player:emit("round/playing", {
-						"countdown" is Countdown, "limit" is Game:limit,
-						"board" is Player:board,
-						"points" is Player:points,
-						"word" is Player:word, "score" is Player:score
-					})
 				end
 			case "Playing" do
 				State := game::state::Scoring
@@ -245,19 +253,28 @@ glib::timeout_add(0, 1000;) do
 				end
 				let MaxScore := max(Players, :score)
 				let Results := list(Players; Player) do
-					let Damage := Player:damage := MaxScore - Player:score
-					let Shield := Player:shield := if Player:score = Player:best["score"] then
-						true
+					if Player:score then
+						let Damage := Player:damage := MaxScore - Player:score
+						let Shield := Player:shield := if Player:score = Player:best["score"] then
+							true
+						else
+							false
+						end
+						Shield = true or Player:points := (old - Damage) max 0
+						{
+							"name" is Player:name,
+							"word" is Player:word, "score" is Player:score,
+							"best" is Player:best, "points" is Player:points,
+							"damage" is Damage, "shield" is Shield
+						}
 					else
-						false
+						{
+							"name" is Player:name,
+							"word" is Player:word, "score" is Player:score,
+							"best" is Player:best, "points" is Player:points,
+							"damage" is 0, "shield" is false
+						}
 					end
-					Shield = true or Player:points := (old - Damage) max 0
-					{
-						"name" is Player:name,
-						"word" is Player:word, "score" is Player:score,
-						"best" is Player:best, "points" is Player:points,
-						"damage" is Damage, "shield" is Shield
-					}
 				end
 				Game:history:put(Results)
 				for Player in Players do

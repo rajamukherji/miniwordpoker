@@ -19,7 +19,7 @@ Game:start
 
 export: class: game(
 	:name, :owner, :password, :state, :players, :countdown, :limit,
-	:round, :history,
+	:round, :history, :events, :rollover,
 	
 	state is enum("Initial", "Starting", "Running", "Choosing", "Scoring", "Ending"),
 	init is fun(Game, Name, Owner, Password) do
@@ -29,6 +29,7 @@ export: class: game(
 		Game:state := game::state::Initial
 		Game:players := []
 		Game:history := []
+		Game:events := []
 	end
 )
 
@@ -138,6 +139,20 @@ meth :apply(Choice: unique_choice, Player: player) do
 	end
 end
 
+class: lottery(choice, :price, :jackpot, :winners)
+meth :name(Choice: lottery) "Lottery"
+meth :description(Choice: lottery) 'Enter lottery for a chance to win a share of the jackpot. Roll-over jackpot is {Choice:jackpot}'
+meth :cost(Choice: lottery) '{Choice:price} points'
+meth :apply(Choice: lottery, Player: player) do
+	Player:points := old - Choice:price
+	if Player in Choice:winners then
+		Player:points := old + (Choice:jackpot / Choice:winners:size)
+		ret '{Player:name} bought a lottery ticket for {Choice:cost} and won {Choice:jackpot / Choice:winners:size}'
+	else
+		ret '{Player:name} bought a lottery ticket for {Choice:cost} but lost'
+	end
+end
+
 meth :start(Player: player, Game: game) do
 	Game:state = game::state::Initial or error("StateError", "Invalid state")
 	Game:owner = Player or error("StateError", "Invalid owner")
@@ -145,6 +160,7 @@ meth :start(Player: player, Game: game) do
 	Game:countdown := Game:limit := 3
 	Game:history := []
 	Game:round := 0
+	Game:events := []
 	for Player in Game:players do
 		Player:emit("round/starting", {
 			"countdown" is Game:countdown, "limit" is Game:limit
@@ -198,7 +214,8 @@ glib::timeout_add(0, 1000;) do
 		if Countdown and Countdown:dec = 0 then
 			switch State: game::state
 			case "Starting" do
-				Game:round := 0
+				Game:round := 1
+				Game:rollover := 0
 				State := game::state::Running
 				Countdown := Game:limit := 10
 				for Player in Players do
@@ -210,140 +227,145 @@ glib::timeout_add(0, 1000;) do
 					Player:emit("round/running", {
 						"countdown" is Countdown, "limit" is Game:limit,
 						"points" is Player:points, "rate" is Player:rate,
+						"log" is [], "round" is Game:round,
 						"players" is list(Game:players; Player) {
 							"points" is Player:points, "rate" is Player:rate
 						}
 					})
 				end
 			case "Running" do
-				Game:round:inc
-				State := game::state::Choosing
-				Countdown := Game:limit := 10
-				let MeanPoints := stat::mean(Players, :points)
-				let MeanRate := stat::mean(Players, :rate)
-				for Player in Players do
-					Player:choices := []
-				end
-				for I in 1 .. 4 do
-					let Choice := switch nil: random
-					case 0.2 do
-						let A1 := switch nil: random
-						case 10 do 1
-						case 2 do 1.1
-						case 1 do 1.2
-						end
-						let B1 := round_points(MeanPoints * random(real) / 2)
-						let A2 := switch nil: random
-						case 5 do 0
-						case 1 do 0.1
-						case 0.2 do 0.2
-						end
-						let B2 := MeanRate * random(0 .. 2) / 5
-						for Player in Players do
-							Player:choices:put(adjust_points(
-								A2 * Player:rate + B2,
-								A1 * Player:points + B1
-							))
-						end
-					case 0.3 do
-						let A1 := switch nil: random
-						case 10 do 1
-						case 2 do 1.1
-						case 1 do 1.2
-						end
-						let B1 := random(0 .. 5)
-						let A2 := switch nil: random
-						case 5 do 0
-						case 1 do 0.1
-						case 0.2 do 0.2
-						end
-						let B2 := MeanPoints * random(1 .. 3) / 4
-						for Player in Players do
-							Player:choices:put(adjust_rate(
-								A2 * Player:points + B2,
-								A1 * Player:rate + B1
-							))
-						end
-					case 0.1 do
-						let Best := max2(dup(Players), :points)[1]
-						let Choice := swap_points(Best)
-						for Player in Players do
-							Player:choices:put(Choice)
-						end
-					case 0.1 do
-						let Other := random(Players)
-						let Change := switch nil: random
-						case 5 do round_points(Other:points / 5)
-						case 2 do round_points(Other:points / 3)
-						case 1 do round_points(Other:points / 2)
-						end
-						let Choice := steal_points(Other, Change)
-						for Player in Players do
-							Player:choices:put(Choice)
-						end
-					case 0.1 do
-						let A1 := switch nil: random
-						case 10 do 1.2
-						case 2 do 1.3
-						case 1 do 1.4
-						end
-						let B1 := round_points(MeanPoints * random(real))
-						let A2 := switch nil: random
-						case 10 do 0.8
-						case 2 do 0.7
-						case 1 do 0.6
-						end
-						let B2 := round_points(-MeanPoints * random(real) / 2)
-						for Player in Players do
-							Player:choices:put(unique_choice(
-								adjust_points(0, A1 * Player:points + B1),
-								adjust_points(0, A2 * Player:points + B2)
-							))
-						end
-					case 0.1 do
-						let Change := MeanPoints * random(1 .. 3) / 4
-						let Others := list(Players):shuffle
-						for Player in Players; Other in Others do
-							let Choice := steal_points(Other, Change)
-							Player:choices:put(Choice)
-						end
-					case 0.1 do
-						let Others := list(Players):shuffle
-						for Player in Players; Other in Others do
-							Player:choices:put(swap_points(Other))
-						end
-					end
-				end
-				for Player in Players do
-					Player:choice := nil
-					Player:emit("round/choosing", {
-						"countdown" is Countdown, "limit" is Game:limit,
-						"points" is Player:points, "rate" is Player:rate,
-						"choices" is list(Player:choices; Choice) {
-							"name" is Choice:name,
-							"description" is Choice:description,
-							"cost" is Choice:cost
-						},
-						"players" is list(Game:players; Player) {
-							"points" is Player:points, "rate" is Player:rate
-						}
-					})
-				end
-			case "Choosing" do
-				let Log := []
-				for Player in Players do
-					if let Choice := Player:choice then
-						Log:put(Choice:apply(Player))
-					end
-				end
-				if Game:round < 10 then
-					State := game::state::Running
+				if Game:round:inc <= 10 then
+					State := game::state::Choosing
 					Countdown := Game:limit := 10
+					let MeanPoints := stat::mean(Players, :points)
+					let MeanRate := stat::mean(Players, :rate)
+					Game:events:empty
 					for Player in Players do
-						Player:emit("round/running", {
+						Player:choices:empty
+					end
+					var Remaining := 4
+					loop
+						print('Remaining cards = {Remaining}\n')
+						while Remaining > 0
+						let Choice := switch nil: random
+						case 0.2 do
+							let A1 := switch nil: random
+							case 10 do 1
+							case 2 do 1.1
+							case 1 do 1.2
+							end
+							let B1 := round_points(MeanPoints * random(real) / 2)
+							let A2 := switch nil: random
+							case 5 do 0
+							case 1 do 0.1
+							case 0.2 do 0.2
+							end
+							let B2 := MeanRate * random(0 .. 2) / 5
+							for Player in Players do
+								Player:choices:put(adjust_points(
+									A2 * Player:rate + B2,
+									A1 * Player:points + B1
+								))
+							end
+						case 0.3 do
+							let A1 := switch nil: random
+							case 10 do 1
+							case 2 do 1.1
+							case 1 do 1.2
+							end
+							let B1 := random(0 .. 5)
+							let A2 := switch nil: random
+							case 5 do 0
+							case 1 do 0.1
+							case 0.2 do 0.2
+							end
+							let B2 := MeanPoints * random(1 .. 3) / 4
+							for Player in Players do
+								Player:choices:put(adjust_rate(
+									A2 * Player:points + B2,
+									A1 * Player:rate + B1
+								))
+							end
+						case 0.1 do
+							let Best := max2(dup(Players), :points)[1]
+							let Choice := swap_points(Best)
+							for Player in Players do
+								Player:choices:put(Choice)
+							end
+						case 0.1 do
+							let Other := random(Players)
+							let Change := switch nil: random
+							case 5 do round_points(Other:points / 5)
+							case 2 do round_points(Other:points / 3)
+							case 1 do round_points(Other:points / 2)
+							end
+							let Choice := steal_points(Other, Change)
+							for Player in Players do
+								Player:choices:put(Choice)
+							end
+						case 0.1 do
+							let A1 := switch nil: random
+							case 10 do 1.2
+							case 2 do 1.3
+							case 1 do 1.4
+							end
+							let B1 := round_points(MeanPoints * random(real))
+							let A2 := switch nil: random
+							case 10 do 0.8
+							case 2 do 0.7
+							case 1 do 0.6
+							end
+							let B2 := round_points(-MeanPoints * random(real) / 2)
+							for Player in Players do
+								Player:choices:put(unique_choice(
+									adjust_points(0, A1 * Player:points + B1),
+									adjust_points(0, A2 * Player:points + B2)
+								))
+							end
+						case 0.1 do
+							let Change := MeanPoints * random(1 .. 3) / 4
+							let Others := list(Players):shuffle
+							for Player in Players; Other in Others do
+								let Choice := steal_points(Other, Change)
+								Player:choices:put(Choice)
+							end
+						case 0.1 do
+							let Others := list(Players):shuffle
+							for Player in Players; Other in Others do
+								Player:choices:put(swap_points(Other))
+							end
+						case 0.1 do
+							Game:rollover or next
+							let Lottery := lottery(10, Game:rollover + 100)
+							Game:rollover := nil
+							Game:events:put(;) do
+								let Entered := list(Players ->? fun(Player) Player:choice = Lottery)
+								let Winners := Lottery:winners := set(Entered ->? fun random(real) < 0.05)
+								Lottery:jackpot := old + 50 * Entered:count
+								if Winners:count = 0 then
+									Game:rollover := Lottery:jackpot
+									ret 'Nobody won the jackpot of {Lottery:jackpot} points, it rolls over to next time'
+								else
+									Game:rollover := 0
+									ret 'There were {Winners:size} winners of the jackpot of {Lottery:jackpot} points'
+								end
+							end
+							for Player in Players do
+								Player:choices:put(Lottery)
+							end
+						end
+						Remaining:dec
+					end
+					for Player in Players do
+						Player:choice := nil
+						Player:emit("round/choosing", {
 							"countdown" is Countdown, "limit" is Game:limit,
 							"points" is Player:points, "rate" is Player:rate,
-							"log" is Log,
+							"choices" is list(Player:choices; Choice) {
+								"name" is Choice:name,
+								"description" is Choice:description,
+								"cost" is Choice:cost
+							},
 							"players" is list(Game:players; Player) {
 								"points" is Player:points, "rate" is Player:rate
 							}
@@ -356,12 +378,34 @@ glib::timeout_add(0, 1000;) do
 						Player:emit("round/scoring", {
 							"countdown" is Countdown, "limit" is Game:limit,
 							"points" is Player:points, "rate" is Player:rate,
-							"log" is Log,
 							"players" is list(Game:players; Player) {
+								"name" is Player:name,
 								"points" is Player:points, "rate" is Player:rate
 							}
 						})
 					end
+				end
+			case "Choosing" do
+				let Log := []
+				for Event in Game:events do
+					Log:put(Event())
+				end
+				for Player in Players do
+					if let Choice := Player:choice then
+						Log:put(Choice:apply(Player))
+					end
+				end
+				State := game::state::Running
+				Countdown := Game:limit := 10
+				for Player in Players do
+					Player:emit("round/running", {
+						"countdown" is Countdown, "limit" is Game:limit,
+						"points" is Player:points, "rate" is Player:rate,
+						"log" is Log, "round" is Game:round,
+						"players" is list(Game:players; Player) {
+							"points" is Player:points, "rate" is Player:rate
+						}
+					})
 				end
 			case "Scoring" do
 				State := game::state::Ending
