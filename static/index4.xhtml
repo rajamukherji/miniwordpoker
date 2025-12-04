@@ -12,6 +12,7 @@
 		}
 
 		#choices {
+			margin-bottom: 1em;
 			width: 57em;
 			height: 22em;
 			display: flex;
@@ -135,8 +136,7 @@
 			padding: 1em;
 			border: 3px double black;
 			width: 100%;
-			font-size: 80%;
-			height: 20em;
+			height: 100em;
 			overflow: auto;
 		}
 
@@ -157,7 +157,7 @@
 	<dialog id="score-dialog">
 		<div id="score-table"/>
 	</dialog>
-	<dialog id="choices-dialog">
+	<dialog id="choices-dialog" style="margin-bottom: 1em;">
 		<div id="choices"/>
 	</dialog>
 	<div id="controls">
@@ -167,9 +167,6 @@
 		<button id="leave-button">Leave Game</button>
 	</div>
 	<div id="main">
-		<div id="display">
-			<div id="history"/>
-		</div>
 		<div id="summary">
 			<div id="countdown">
 				<span id="countdown-message"/>
@@ -182,6 +179,9 @@
 			<thead><tr><th>Player</th><th>Points</th></tr></thead>
 			<tbody id="players"/>
 		</table>
+		<div id="display">
+			<div id="history"/>
+		</div>
 	</div>
 	<div id="logs"/>
 	<script src="/main4.js"/>

@@ -206,6 +206,8 @@ events["round/running"] = function(data) {
 		span.textContent = player.words.toString();
 		span.style.width = player.words + "px";
 	});
+	historyDiv.appendChild(create("h3", `Round ${data.round}`));
+	historyDiv.appendChild(create("hr"));
 	if (data.log) data.log.forEach(log => {
 		historyDiv.appendChild(create("div", {"class": "log"}, log));
 	});
