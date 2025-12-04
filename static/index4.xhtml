@@ -12,18 +12,29 @@
 		}
 
 		#choices {
-			width: 46em;
-			height: 16em;
-			border: 0.2em solid gray;
-			margin: 1em;
+			width: 57em;
+			height: 22em;
 			display: flex;
 		}
 
 		.choice {
 			margin: 1em;
 			border: 0.2em solid gray;
-			height: 14em;
-			width: 10em;
+			border-radius: 5px;
+			height: 20em;
+			width: 13em;
+		}
+
+		.choice .positive {
+			color: green;
+		}
+
+		.choice .negative {
+			color: red;
+		}
+
+		.choice .neutral {
+			color: gray;
 		}
 
 		.choice .name {
@@ -31,10 +42,18 @@
 			text-align: center;
 			border-bottom: 0.2em solid gray;
 			height: 2em;
+			line-height: 2em;
+		}
+
+		.choice .image {
+			height: 10em;
+			width: 12em;
 		}
 
 		.choice .description {
-			height: 10em;
+			height: 6em;
+			border-top: 2px solid gray;
+			padding: 0.5em;
 		}
 
 		.choice .cost {
@@ -45,15 +64,9 @@
 		}
 
 		.choice.selected {
-			border: 0.2em solid red;
-		}
-
-		.choice.selected .name {
-			border-bottom: 0.2em solid red;
-		}
-
-		.choice.selected .cost {
-			border-top: 0.2em solid red;
+			border: 0.2em solid blue;
+			box-shadow: 0 0 6px blue;
+			color: blue;
 		}
 
 		#side {
@@ -74,7 +87,7 @@
 			color: red;
 		}
 
-		.points {
+		.words {
 			display: inline-block;
 			background: yellow;
 			transition: all 1s ease;
@@ -98,14 +111,14 @@
 			vertical-align: middle;
 		}
 
-		.score-row > .points {
+		.score-row > .words {
 			display: inline-block;
 			width: 3em;
 			text-align: right;
 			vertical-align: middle;
 		}
 
-		#current-points {
+		#current-words {
 			width: 20em;
 		}
 
@@ -162,8 +175,8 @@
 				<span id="countdown-message"/>
 				<progress id="countdown-progress"/>
 			</div>
-			<div>Current Points: <span id="points"/></div>
-			<div>Current Rate: <span id="rate"/></div>
+			<div>Current Points: <span id="words"/></div>
+			<div>Current Rate: <span id="dictionaries"/></div>
 		</div>
 		<table id="side">
 			<thead><tr><th>Player</th><th>Points</th></tr></thead>

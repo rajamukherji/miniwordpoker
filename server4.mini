@@ -14,7 +14,8 @@ def MimeTypes := {
 	"xhtml" is "application/xhtml+xml",
 	"js" is "text/javascript",
 	"css" is "text/css",
-	"ico" is "image/png"
+	"ico" is "image/png",
+	"png" is "image/png"
 }
 
 let serve_static_content := for Arg in Args do
@@ -133,28 +134,28 @@ Server:add_websocket_handler("/connect", nil, nil; Server, Message, Path, Socket
 			send_event(Socket, "round/ending", {
 				"countdown" is Game:countdown, "limit" is Game:limit,
 				"players" is list(Game:players; Player) {
-					"points" is Player:points
+					"words" is Player:words
 				}
 			})
 		case "Running" do
 			send_event(Socket, "round/running", {
 				"countdown" is Game:countdown, "limit" is Game:limit,
-				"points" is Player:points, "rate" is Player:rate,
+				"words" is Player:words, "dictionaries" is Player:dictionaries,
 				"players" is list(Game:players; Player) {
-					"points" is Player:points, "rate" is Player:rate
+					"words" is Player:words, "dictionaries" is Player:dictionaries
 				}
 			})
 		case "Choosing" do
 			send_event(Socket, "round/choosing", {
 				"countdown" is Game:countdown, "limit" is Game:limit,
-				"points" is Player:points, "rate" is Player:rate,
+				"words" is Player:words, "dictionaries" is Player:dictionaries,
 				"choices" is list(Player:choices; Choice) {
 					"name" is Choice:name,
 					"description" is Choice:description,
 					"cost" is Choice:cost(Player)
 				},
 				"players" is list(Game:players; Player) {
-					"points" is Player:points, "rate" is Player:rate
+					"words" is Player:words, "dictionaries" is Player:dictionaries
 				}
 			})
 		case "Scoring" do
@@ -162,13 +163,13 @@ Server:add_websocket_handler("/connect", nil, nil; Server, Message, Path, Socket
 				"countdown" is Game:countdown, "limit" is Game:limit,
 				"players" is list(Game:players; Player) {
 					"name" is Player:name, "choices" is Player:history,
-					"points" is Player:points, "rate" is Player:rate
+					"words" is Player:words, "dictionaries" is Player:dictionaries
 				}
 			})
 		case "Ending" do
 			send_event(Socket, "round/ending", {
 				"countdown" is Game:countdown, "limit" is Game:limit,
-				"players" is list(Players; Player) {"points" is Player:points}
+				"players" is list(Players; Player) {"words" is Player:words}
 			})
 		end
 	end

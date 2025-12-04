@@ -2,8 +2,8 @@ console.log("Hello world!")
 
 let socket = null;
 
-let pointsSpan = document.getElementById("points");
-let rateSpan = document.getElementById("rate");
+let pointsSpan = document.getElementById("words");
+let rateSpan = document.getElementById("dictionaries");
 let historyDiv = document.getElementById("history");
 let choicesDiv = document.getElementById("choices");
 let choicesDialog = document.getElementById("choices-dialog");
@@ -136,14 +136,14 @@ events["game/join"] = function(data) {
 			if (player.self) attrs["style"] = "font-weight:bold;color:red;";
 			playersBody.appendChild(create("tr",
 				create("td", attrs, player.name),
-				create("td", attrs, create("span.points", {style: `width:${player.points}px`}, player.points.toString()))
+				create("td", attrs, create("span.words", {style: `width:${player.words}px`}, player.words.toString()))
 			));
 		});
 		if (data.countdown) countdown = {message: data.state, value: data.countdown, limit: data.limit};
 	} else {
 		playersBody.appendChild(create("tr",
 			create("td", data.name),
-			create("td", create("span.points", {style: `width:${data.points}px`}, data.points.toString()))
+			create("td", create("span.words", {style: `width:${data.words}px`}, data.words.toString()))
 		));
 	}
 };
@@ -184,7 +184,7 @@ events["game/state"] = function(data) {
 		if (player.self) attrs["style"] = "font-weight:bold;color:red;";
 		playersBody.appendChild(create("tr",
 			create("td", attrs, player.name),
-			create("td", attrs, create("span.points", {style: `width:${player.points}px`}, player.points.toString()))
+			create("td", attrs, create("span.words", {style: `width:${player.words}px`}, player.words.toString()))
 		));
 	});
 };
@@ -198,39 +198,44 @@ let pointsInterval;
 
 events["round/running"] = function(data) {
 	choicesDiv.removeChildren();
-	pointsSpan.textContent = data.points.toString();
-	rateSpan.textContent = data.rate.toString();
+	pointsSpan.textContent = data.words.toString();
+	rateSpan.textContent = data.dictionaries.toString();
 	let rows = playersBody.children;
 	data.players.forEach((player, i) => {
 		let span = rows[i].firstChild.nextSibling.firstChild;
-		span.textContent = player.points.toString();
-		span.style.width = player.points + "px";
+		span.textContent = player.words.toString();
+		span.style.width = player.words + "px";
 	});
 	if (data.log) data.log.forEach(log => {
 		historyDiv.appendChild(create("div", {"class": "log"}, log));
 	});
 	if (pointsInterval == null) pointsInterval = setInterval(() => {
 		data.players.forEach((player, i) => {
-			player.points += player.rate;
+			player.words += player.dictionaries;
 			let span = rows[i].firstChild.nextSibling.firstChild;
-			span.textContent = player.points.toString();
-			span.style.width = player.points + "px";
+			span.textContent = player.words.toString();
+			span.style.width = player.words + "px";
 		});
 	}, 1000);
-	// TODO: update points over time here
+	// TODO: update words over time here
 	countdown = {message: "Running", value: data.countdown, limit: data.limit};
 	choicesDialog.close();
 };
 
 events["round/choosing"] = function(data) {
-	pointsSpan.textContent = data.points.toString();
-	rateSpan.textContent = data.rate.toString();
+	pointsSpan.textContent = data.words.toString();
+	rateSpan.textContent = data.dictionaries.toString();
 	let choices = data.choices;
 	choicesDiv.replaceChildren(choices.map((choice, index) => {
 		choice.index = index + 1;
+		let name = create("div.name");
+		name.innerHTML = choice.name;
+		let description = create("div.description");
+		description.innerHTML = choice.description;
 		choice.element = create("div.choice",
-			create("div.name", choice.name),
-			create("div.description", choice.description),
+			name,
+			create("img.image", {src: `/cards/${choice.image}.png`}),
+			description,
 			create("div.cost", choice.cost)
 		);
 		choice.element.onclick = function(event) {
@@ -248,8 +253,8 @@ events["round/choosing"] = function(data) {
 	let rows = playersBody.children;
 	data.players.forEach((player, i) => {
 		let span = rows[i].firstChild.nextSibling.firstChild;
-		span.textContent = player.points.toString();
-		span.style.width = player.points + "px";
+		span.textContent = player.words.toString();
+		span.style.width = player.words + "px";
 	})
 	countdown = {message: "Choosing", value: data.countdown, limit: data.limit};
 };
@@ -271,7 +276,7 @@ function resultRow(player, i) {
 			score: player.score,
 			element: create("div.score-row", {style: `top:${i * 38}px`},
 				create("span.name", player.name),
-				create("span.score", player.points.toString())
+				create("span.score", player.words.toString())
 			)
 		};
 	}
@@ -291,8 +296,8 @@ events["round/scoring"] = function(data) {
 	let rows = playersBody.children;
 	data.players.forEach((player, i) => {
 		let span = rows[i].firstChild.nextSibling.firstChild;
-		span.textContent = player.points.toString();
-		span.style.width = player.points + "px";
+		span.textContent = player.words.toString();
+		span.style.width = player.words + "px";
 	})
 	let scores = data.players.map(resultRow);
 	scoreTable.style.height = (scores.length * 38) + 20 + "px";
@@ -320,8 +325,8 @@ events["round/ending"] = function(data) {
 	let rows = playersBody.children;
 	data.players.forEach((player, i) => {
 		let span = rows[i].firstChild.nextSibling.firstChild;
-		span.textContent = player.points.toString();
-		span.style.width = player.points + "px";
+		span.textContent = player.words.toString();
+		span.style.width = player.words + "px";
 	})
 	let tbody = create("tbody");
 	while (scoreTable.firstChild) tbody.appendChild(scoreTable.firstChild);
