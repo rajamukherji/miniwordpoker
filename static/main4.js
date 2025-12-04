@@ -2,8 +2,8 @@ console.log("Hello world!")
 
 let socket = null;
 
-let pointsSpan = document.getElementById("words");
-let rateSpan = document.getElementById("dictionaries");
+let wordsSpan = document.getElementById("words");
+let dictionariesSpan = document.getElementById("dictionaries");
 let historyDiv = document.getElementById("history");
 let choicesDiv = document.getElementById("choices");
 let choicesDialog = document.getElementById("choices-dialog");
@@ -198,8 +198,8 @@ let pointsInterval;
 
 events["round/running"] = function(data) {
 	choicesDiv.removeChildren();
-	pointsSpan.textContent = data.words.toString();
-	rateSpan.textContent = data.dictionaries.toString();
+	wordsSpan.textContent = data.words.toString();
+	dictionariesSpan.textContent = data.dictionaries.toString();
 	let rows = playersBody.children;
 	data.players.forEach((player, i) => {
 		let span = rows[i].firstChild.nextSibling.firstChild;
@@ -219,6 +219,7 @@ events["round/running"] = function(data) {
 			let span = rows[i].firstChild.nextSibling.firstChild;
 			span.textContent = player.words.toString();
 			span.style.width = player.words + "px";
+			wordsSpan.textContent = player.words.toString();
 		});
 	}, 1000);
 	// TODO: update words over time here
@@ -227,8 +228,13 @@ events["round/running"] = function(data) {
 };
 
 events["round/choosing"] = function(data) {
-	pointsSpan.textContent = data.words.toString();
-	rateSpan.textContent = data.dictionaries.toString();
+	if (data.log) data.log.forEach(log => {
+		let entry = create("div", {"class": "log"});
+		entry.innerHTML = log;
+		historyDiv.appendChild(entry);
+	});
+	wordsSpan.textContent = data.words.toString();
+	dictionariesSpan.textContent = data.dictionaries.toString();
 	let choices = data.choices;
 	choicesDiv.replaceChildren(choices.map((choice, index) => {
 		choice.index = index + 1;
@@ -291,7 +297,9 @@ events["round/scoring"] = function(data) {
 	countdown = {message: "Scoring", value: data.countdown, limit: data.limit};
 	choicesDialog.close();
 	if (data.log) data.log.forEach(log => {
-		historyDiv.appendChild(create("div", {"class": "log"}, log));
+		let entry = create("div", {"class": "log"});
+		entry.innerHTML = log;
+		historyDiv.appendChild(entry);
 	});
 	if (pointsInterval != null) {
 		clearInterval(pointsInterval);
