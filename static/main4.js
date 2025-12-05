@@ -22,10 +22,7 @@ let countdownSpan = document.getElementById("countdown-message");
 let countdownProgress = document.getElementById("countdown-progress");
 let countdown;
 
-let chart = echarts.init(document.getElementById("chart"), {
-	width: 800,
-	height: 600
-});
+let chart = echarts.init(document.getElementById("chart"));
 
 let id = sessionStorage.getItem("id");
 if (id === null) {
@@ -131,9 +128,11 @@ events["game/list"] = function(data) {
 let ticks = [];
 for (let i = 0; i < 120; ++i) ticks.push(i);
 chart.setOption({
-	animationDuration: 10000,
-	xAxis: {type: 'category', data: ticks, axisLabel: {fontsize: 16}},
-	yAxis: {type: 'value', axisLabel: {fontsize: 16}}
+	textStyle: {fontSize: "20px"},
+	animationDuration: 100,
+	grid: {left: 0, right: 0, top: "10px", bottom: "10px"},
+	xAxis: {type: 'category', data: ticks},
+	yAxis: {type: 'value'}
 });
 let series = [];
 
@@ -152,7 +151,7 @@ events["game/join"] = function(data) {
 				create("td", attrs, player.name),
 				create("td", attrs, create("span.words", {style: `width:${player.words}px`}, player.words.toString()))
 			));
-			series.push({name: player.name, type: 'line', data: [], showSymbol: false, endLabel: {show: true, fontsize: 16, formatter: '{a}: {c}'}});
+			series.push({name: player.name, type: 'line', data: [], showSymbol: false, endLabel: {show: true, formatter: '{a}: {c}'}});
 		});
 		if (data.countdown) countdown = {message: data.state, value: data.countdown, limit: data.limit};
 	} else {
@@ -160,7 +159,7 @@ events["game/join"] = function(data) {
 			create("td", data.name),
 			create("td", create("span.words", {style: `width:${data.words}px`}, data.words.toString()))
 		));
-		series.push({name: data.name, type: 'line', data: [], showSymbol: false, fontsize: 16, endLabel: {show: true, formatter: '{a}: {c}'}});
+		series.push({name: data.name, type: 'line', data: [], showSymbol: false, endLabel: {show: true, formatter: '{a}: {c}'}});
 	}
 	chart.setOption({series});
 };
@@ -236,6 +235,7 @@ events["round/running"] = function(data) {
 		entry.innerHTML = log;
 		historyDiv.appendChild(entry);
 	});
+	historyDiv.scrollTop = historyDiv.scrollHeight;
 	if (pointsInterval == null) pointsInterval = setInterval(() => {
 		data.players.forEach((player, i) => {
 			player.words += player.dictionaries;
@@ -258,6 +258,7 @@ events["round/choosing"] = function(data) {
 		entry.innerHTML = log;
 		historyDiv.appendChild(entry);
 	});
+	historyDiv.scrollTop = historyDiv.scrollHeight;
 	wordsSpan.textContent = data.words.toString();
 	dictionariesSpan.textContent = data.dictionaries.toString();
 	let choices = data.choices;
@@ -310,7 +311,7 @@ function resultRow(player, i) {
 		};
 	} else {
 		return {
-			score: player.score,
+			score: player.words,
 			element: create("div.score-row", {style: `top:${i * 38}px`},
 				create("span.name", player.name),
 				create("span.score", player.words.toString())
@@ -328,6 +329,7 @@ events["round/scoring"] = function(data) {
 		entry.innerHTML = log;
 		historyDiv.appendChild(entry);
 	});
+	historyDiv.scrollTop = historyDiv.scrollHeight;
 	if (pointsInterval != null) {
 		clearInterval(pointsInterval);
 		pointsInterval = null;

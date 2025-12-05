@@ -128,8 +128,10 @@
 		}
 
 		#chart {
-			height: 600px;
-			width: 100%;
+			border: 3px double black;
+			height: 800px;
+			width: 60%;
+			flex: 60% 0 1;
 		}
 
 		#display {
@@ -141,8 +143,11 @@
 			padding: 1em;
 			border: 3px double black;
 			width: 100%;
-			height: 50em;
+			height: 800px;
 			overflow: auto;
+			flex: 1;
+			margin-left: 10px;
+			font-size: 110%;
 		}
 
 		th {
@@ -180,14 +185,14 @@
 			</div>
 			<div>You have <span id="words"/> words and <span id="dictionaries"/> dictionaries.</div>
 		</div>
-		<div id="chart"/>
+		<div id="display">
+			<div id="chart"/>
+			<div id="history"/>
+		</div>
 		<table id="side">
 			<thead><tr><th>Player</th><th>Words</th></tr></thead>
 			<tbody id="players"/>
 		</table>
-		<div id="display">
-			<div id="history"/>
-		</div>
 	</div>
 	<div id="logs"/>
 	<script src="/main4.js"/>
