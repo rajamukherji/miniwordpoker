@@ -127,6 +127,11 @@
 			margin: 2em;
 		}
 
+		#chart {
+			height: 600px;
+			width: 100%;
+		}
+
 		#display {
 			display: flex;
 			flex-direction: row;
@@ -149,6 +154,7 @@
 		}
 	</style>
 	<script src="/lib.js" type="text/javascript"/>
+	<script src="/echarts.js" type="text/javascript"/>
 </head>
 <body>
 	<dialog id="join-dialog">
@@ -172,9 +178,9 @@
 				<span id="countdown-message"/>
 				<progress id="countdown-progress"/>
 			</div>
-			<div>Current Words: <span id="words"/></div>
-			<div>Current Dictionaries: <span id="dictionaries"/></div>
+			<div>You have <span id="words"/> words and <span id="dictionaries"/> dictionaries.</div>
 		</div>
+		<div id="chart"/>
 		<table id="side">
 			<thead><tr><th>Player</th><th>Words</th></tr></thead>
 			<tbody id="players"/>

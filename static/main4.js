@@ -22,6 +22,11 @@ let countdownSpan = document.getElementById("countdown-message");
 let countdownProgress = document.getElementById("countdown-progress");
 let countdown;
 
+let chart = echarts.init(document.getElementById("chart"), {
+	width: 800,
+	height: 600
+});
+
 let id = sessionStorage.getItem("id");
 if (id === null) {
 	let arr = new Uint8Array(16);
@@ -123,6 +128,15 @@ events["game/list"] = function(data) {
 	if (joinDialog.open) setTimeout(() => send("game/list", {}), 1000);
 };
 
+let ticks = [];
+for (let i = 0; i < 120; ++i) ticks.push(i);
+chart.setOption({
+	animationDuration: 10000,
+	xAxis: {type: 'category', data: ticks, axisLabel: {fontsize: 16}},
+	yAxis: {type: 'value', axisLabel: {fontsize: 16}}
+});
+let series = [];
+
 events["game/join"] = function(data) {
 	if (data.players) {
 		createButton.style.display = "none";
@@ -138,6 +152,7 @@ events["game/join"] = function(data) {
 				create("td", attrs, player.name),
 				create("td", attrs, create("span.words", {style: `width:${player.words}px`}, player.words.toString()))
 			));
+			series.push({name: player.name, type: 'line', data: [], showSymbol: false, endLabel: {show: true, fontsize: 16, formatter: '{a}: {c}'}});
 		});
 		if (data.countdown) countdown = {message: data.state, value: data.countdown, limit: data.limit};
 	} else {
@@ -145,7 +160,9 @@ events["game/join"] = function(data) {
 			create("td", data.name),
 			create("td", create("span.words", {style: `width:${data.words}px`}, data.words.toString()))
 		));
+		series.push({name: data.name, type: 'line', data: [], showSymbol: false, fontsize: 16, endLabel: {show: true, formatter: '{a}: {c}'}});
 	}
+	chart.setOption({series});
 };
 
 events["game/leave"] = function(data) {
@@ -192,6 +209,10 @@ events["game/state"] = function(data) {
 events["round/starting"] = function(data) {
 	gameState = "starting";
 	countdown = {message: "Starting", value: data.countdown, limit: data.limit};
+	series.forEach(s => {
+		s.data = [];
+	});
+	chart.setOption({series});
 };
 
 let pointsInterval;
@@ -205,7 +226,9 @@ events["round/running"] = function(data) {
 		let span = rows[i].firstChild.nextSibling.firstChild;
 		span.textContent = player.words.toString();
 		span.style.width = player.words + "px";
+		series[i].data.push(player.words);
 	});
+	chart.setOption({series});
 	historyDiv.appendChild(create("h3", `Round ${data.round}`));
 	historyDiv.appendChild(create("hr"));
 	if (data.log) data.log.forEach(log => {
@@ -220,7 +243,9 @@ events["round/running"] = function(data) {
 			span.textContent = player.words.toString();
 			span.style.width = player.words + "px";
 			wordsSpan.textContent = player.words.toString();
+			series[i].data.push(player.words);
 		});
+		chart.setOption({series});
 	}, 1000);
 	// TODO: update words over time here
 	countdown = {message: "Running", value: data.countdown, limit: data.limit};
@@ -265,7 +290,9 @@ events["round/choosing"] = function(data) {
 		let span = rows[i].firstChild.nextSibling.firstChild;
 		span.textContent = player.words.toString();
 		span.style.width = player.words + "px";
-	})
+		series[i].data.push(player.words);
+	});
+	chart.setOption({series});
 	countdown = {message: "Choosing", value: data.countdown, limit: data.limit};
 };
 

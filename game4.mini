@@ -496,16 +496,18 @@ glib::timeout_add(0, 1000;) do
 					end
 					for Player in Players do
 						Player:choice := nil
+						let Choices := list(Player:choices; Choice) {
+							"name" is Choice:name,
+							"image" is Choice:image,
+							"description" is Choice:description,
+							"cost" is Choice:cost
+						}
+						Player:confused and Choices:shuffle
 						Player:emit("round/choosing", {
 							"countdown" is Countdown, "limit" is Game:limit,
 							"words" is Player:words, "dictionaries" is Player:dictionaries,
 							"log" is Log, "round" is Game:round,
-							"choices" is list(Player:choices; Choice) {
-								"name" is Choice:name,
-								"image" is Choice:image,
-								"description" is Choice:description,
-								"cost" is Choice:cost
-							},
+							"choices" is Choices,
 							"players" is list(Game:players; Player) {
 								"words" is Player:words, "dictionaries" is Player:dictionaries
 							}
@@ -527,6 +529,9 @@ glib::timeout_add(0, 1000;) do
 					end
 				end
 			case "Choosing" do
+				for Player in Players do
+					Player:confused := nil
+				end
 				let Log := []
 				for Event in Game:events do
 					Log:put(Event(){})

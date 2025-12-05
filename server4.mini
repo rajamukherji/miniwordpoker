@@ -8,6 +8,22 @@ import: game("game4")
 
 logger: log("main")
 
+let Options := with Options := {
+	"Port" is 8081
+} do
+	var I := 0
+	loop
+		let Arg := while Args[I:inc]
+		switch Arg: string
+		case "--port" do
+			Options["Port"] := integer(Args[I:inc])
+		end
+	end
+	Options
+end
+
+log::info('Options = {Options}')
+
 let Server := soup::Server()
 
 def MimeTypes := {
@@ -188,8 +204,8 @@ on Error do
 	Socket:close(soup::WebsocketCloseCode::server_error, string(Error))
 end
 
-log::info("Listening on http://0.0.0.0:8081")
+log::info('Listening on http://0.0.0.0:{Options::Port}')
 
-Server:listen_all(8081, nil)
+Server:listen_all(Options::Port, nil)
 
 callcc(0)
