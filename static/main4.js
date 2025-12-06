@@ -168,6 +168,7 @@ events["game/leave"] = function(data) {
 	if (data.player) {
 		let rows = playersBody.children;
 		if (rows.length >= data.player) rows[data.player - 1].remove();
+		series.splice(data.player - 1, 1);
 	} else {
 		createButton.style.display = null;
 		joinButton.style.display = null;
@@ -209,7 +210,7 @@ events["round/starting"] = function(data) {
 	gameState = "starting";
 	countdown = {message: "Starting", value: data.countdown, limit: data.limit};
 	series.forEach(s => {
-		s.data = [];
+		s.data = [0];
 	});
 	chart.setOption({series});
 };
