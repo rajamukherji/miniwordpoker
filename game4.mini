@@ -444,7 +444,7 @@ glib::timeout_add(0, 1000;) do
 							end
 						case 0.1 do
 							for Player in Players do
-								let Others := random(Players)
+								let Other := random(Players)
 								Player:choices:put(swap_words(Other))
 							end
 						case 0.1 do
