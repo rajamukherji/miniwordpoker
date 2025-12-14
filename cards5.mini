@@ -1,0 +1,26 @@
+export: class: card()
+
+def Cards := {}
+
+def card([A], {B}) do
+	let Class := class ! (A, B)
+	Cards[Class:name] := Class
+end
+
+:>-------------------------------------------------------<
+
+card: change_points(:price, :change, weight is 10, generate is; Player) do
+
+end
+
+meth :title(Card: change_points) if Card:change > 0 then
+	'Gain {Card:change} points'
+else
+	'Lose {Card:change} points'
+end
+
+meth :description(Card: change_points) if Card:change > 0 then
+	'Gain {Card:change} points'
+else
+	'Lose {Card:change} points'
+end
