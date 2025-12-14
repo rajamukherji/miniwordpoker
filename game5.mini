@@ -3,6 +3,8 @@ import: gobject("gir/GObject")
 import: json("fmt/json")
 import: uuid("util/uuid")
 import: stat("math/stat")
+import: dist("math/dist")
+import: cards("cards5")
 logger: log("main")
 
 :<
@@ -19,7 +21,7 @@ Game:start
 
 export: class: game(
 	:name, :owner, :password, :state, :players, :countdown, :limit,
-	:round, :history, :events, :rollover, :values,
+	:round, :history, :events, :rollover, :values, :mult,
 	
 	state is enum("Initial", "Starting", "Running", "Choosing", "Scoring", "Ending"),
 	init is fun(Game, Name, Owner, Password) do
@@ -34,7 +36,7 @@ export: class: game(
 )
 
 export: class: player(:name, :callback, :game, :history, :points, :resources,
-	:choices, :choice, :investments, :effects,
+	:choices, :choice, :investments, :effects, :luck, :random,
 	init is fun(Player, Name, Callback) do
 		Player:name := Name
 		Player:callback := Callback or fun(Player, Event, Data) do
@@ -65,8 +67,8 @@ end
 meth :join(Player: player, Game: game) do
 	Player:game and error("StateError", "Player already in game")
 	Player:game := Game
-	Player:points := 0
-	Player:dictionaries := 1
+	Player:points := 100
+	Player:resources := map(cards::AllResources;) 1
 	for Other in Game:players do
 		Other:emit("game/join", {"name" is Player:name, "points" is Player:points, "dictionaries" is Player:dictionaries})
 	end
@@ -76,169 +78,6 @@ end
 
 let Games := []
 
-fun change_verb(Change) do
-	if Change > 0 then
-		'<span class=\"positive\">➕</span> Gain'
-	elseif Change < 0 then
-		'<span class=\"negative\">➖</span> Lose'
-	end
-end
-
-fun change_verb_past(Change) do
-	if Change > 0 then
-		'<span class=\"positive\">➕</span> Gained'
-	elseif Change < 0 then
-		'<span class=\"negative\">➖</span> Lost'
-	end
-end
-
-class: choice()
-
-class: adjust_dictionaries(choice, :price, :change)
-meth :generate(Choice: adjust_dictionaries, Player: player) do
-end
-meth :name(Choice: adjust_dictionaries) '{change_verb(Choice:change)} Dictionaries'
-meth :image(Choice: adjust_dictionaries) "dictionary"
-meth :description(Choice: adjust_dictionaries) '{change_verb(Choice:change)} {math::abs(Choice:change)} dictionaries'
-meth :cost(Choice: adjust_dictionaries) '{Choice:price} points'
-meth :apply(Choice: adjust_dictionaries, Player: player) do
-	Player:points := old - Choice:price
-	Player:dictionaries := old + Choice:change
-	ret if Choice:price != 0 then
-		'{Player:name} spent {Choice:price} points to {change_verb(Choice:change)} {math::abs(Choice:change)} dictionaries'
-	else
-		'{Player:name} {change_verb_past(Choice:change)} {math::abs(Choice:change)} dictionaries'
-	end
-end
-
-class: adjust_words(choice, :price, :change)
-meth :name(Choice: adjust_words) '{change_verb(Choice:change)} Points'
-meth :image(Choice: adjust_words) "buy_words"
-meth :description(Choice: adjust_words) '{change_verb(Choice:change)} {math::abs(Choice:change)} points'
-meth :cost(Choice: adjust_words) '{Choice:price} dictionaries'
-meth :apply(Choice: adjust_words, Player: player) do
-	Player:dictionaries := old - Choice:price
-	Player:points := old + Choice:change
-	ret if Choice:price != 0 then
-		'{Player:name} spent {Choice:price} dictionaries to {change_verb(Choice:change)} {math::abs(Choice:change)} points'
-	else
-		'{Player:name} {change_verb_past(Choice:change)} {math::abs(Choice:change)} points'
-	end
-end
-
-class: block_card(choice, :card)
-meth :name(Choice: block_card) "Block"
-meth :image(Choice: block_card) "block_player"
-meth :description(Choice: block_card) 'Block \"{Choice:card:description}\"'
-meth :cost(Choice: block_card) "Free"
-meth :apply(Choice: block_card, Player: player) do
-	ret '{Player:name} blocked \"{Choice:card:description}\"'
-end
-
-class: swap_words(choice, :with, :blocked)
-meth :name(Choice: swap_words) "Swap Points"
-meth :image(Choice: swap_words) "swap_words_sad"
-meth :description(Choice: swap_words) 'Swap points with {Choice:with:name}'
-meth :cost(Choice: swap_words) "Free"
-meth :apply(Choice: swap_words, Player: player) do
-	if Choice:blocked then
-		ret '{Player:name} was blocked from swapping points with {Choice:with:name}'
-	else
-		exchange(Player:points, Choice:with:points)
-		ret '{Player:name} swapped their points with {Choice:with:name}'
-	end
-end
-
-class: swap_dictionaries(choice, :with, :blocked)
-meth :name(Choice: swap_dictionaries) "Swap Dictionaries"
-meth :image(Choice: swap_dictionaries) "mute_player"
-meth :description(Choice: swap_dictionaries) 'Swap dictionaries with {Choice:with:name}'
-meth :cost(Choice: swap_dictionaries) "Free"
-meth :apply(Choice: swap_dictionaries, Player: player) do
-	if Choice:blocked then
-		ret '{Player:name} was blocked from swapping dictionaries with {Choice:with:name}'
-	else
-		exchange(Player:dictionaries, Choice:with:dictionaries)
-		ret '{Player:name} swapped their dictionaries with {Choice:with:name}'
-	end
-end
-
-class: steal_words(choice, :with, :change, :blocked)
-meth :name(Choice: steal_words) "Steal Points"
-meth :image(Choice: steal_words) "threaten_player"
-meth :description(Choice: steal_words) 'Steal {Choice:change} points from {Choice:with:name}'
-meth :cost(Choice: steal_words) "Free"
-meth :apply(Choice: steal_words, Player: player) do
-	if Choice:blocked then
-		ret '{Player:name} was blocked from stealing {Choice:change} points from {Choice:with:name}'
-	else
-		Choice:with:points := old - Choice:change
-		Player:points := old + Choice:change
-		ret '{Player:name} stole {Choice:change} points from {Choice:with:name}'
-	end
-end
-
-class: unique_choice(choice, :reward, :penalty)
-meth :name(Choice: unique_choice) "Choose Wisely"
-meth :image(Choice: unique_choice) "scramble"
-meth :description(Choice: unique_choice) 'If only you choose this then {Choice:reward:description}, otherwise {Choice:penalty:description}'
-meth :cost(Choice: unique_choice) "Free?"
-meth :apply(Choice: unique_choice, Player: player) do
-	let Players := Player:game:players
-	let Index := Player:choices:find(Choice)
-	if count(Players ->? fun(Other) Other:choice = Other:choices[Index]) > 1 then
-		Choice:penalty:apply(Player)
-	else
-		Choice:reward:apply(Player)
-	end
-end
-
-class: lottery(choice, :price, :jackpot, :winners)
-meth :name(Choice: lottery) "Lottery"
-meth :image(Choice: lottery) "buy_ticket"
-meth :description(Choice: lottery) 'Enter lottery for a chance to win a share of the jackpot. Roll-over jackpot is {Choice:jackpot}'
-meth :cost(Choice: lottery) '{Choice:price} points'
-meth :apply(Choice: lottery, Player: player) do
-	Player:points := old - Choice:price
-	if Player in Choice:winners then
-		Player:points := old + (Choice:jackpot / Choice:winners:size)
-		ret '{Player:name} bought a lottery ticket for {Choice:cost} and won {Choice:jackpot / Choice:winners:size}'
-	else
-		ret '{Player:name} bought a lottery ticket for {Choice:cost} but lost'
-	end
-end
-
-class: investment(choice, :price, :term, :reward)
-meth :name(Choice: investment) "Investment"
-meth :image(Choice: investment) "double_dictionary"
-meth :description(Choice: investment) '{Choice:reward:description} after {Choice:term} rounds'
-meth :cost(Choice: investment) '{Choice:price} points'
-meth :apply(Choice: investment, Player: player) do
-	Player:points := old - Choice:price
-	Player:investments:put((Player:game:round + Choice:term, Choice:reward))
-	ret '{Player:name} invested {Choice:price} points to {Choice:reward:description} in {Choice:term} rounds'
-end
-
-class: multiply_words(choice, :multiple)
-meth :name(Choice: multiply_words) "Multiply Points"
-meth :image(Choice: multiply_words) "share_letters"
-meth :description(Choice: multiply_words) '✖Multiply points by {Choice:multiple}'
-meth :cost(Choice: multiply_words) "Free"
-meth :apply(Choice: multiply_words, Player: player) do
-	Player:points := old * Choice:multiple
-	ret '{Player:name} multiplied their points by {Choice:multiple}'
-end
-
-class: confuse_player(choice, :player)
-meth :name(Choice: confuse_player) "Confuse Player"
-meth :image(Choice: confuse_player) "serendipity"
-meth :description(Choice: confuse_player) 'Make {Choice:player:name} pick a random card'
-meth :cost(Choice: confuse_player) "Free"
-meth :apply(Choice: confuse_player, Player: player) do
-	Player:confused := 1
-	ret '{Player:name} cast confusion on {Choice:player:name}'
-end
-
 meth :start(Player: player, Game: game) do
 	Game:state = game::state::Initial or error("StateError", "Invalid state")
 	Game:owner = Player or error("StateError", "Invalid owner")
@@ -247,6 +86,7 @@ meth :start(Player: player, Game: game) do
 	Game:history := []
 	Game:round := 0
 	Game:events := []
+	Game:values := map(cards::AllResources;) 1
 	for Player in Game:players do
 		Player:emit("round/starting", {
 			"countdown" is Game:countdown, "limit" is Game:limit
@@ -275,21 +115,16 @@ meth :choose(Player: player, Index: any) do
 	ret true
 end
 
-def Points := polynomial("Points")
-def Rate := polynomial("Rate")
-
-fun round_points(Points) do
-	switch Points: integer
-	case 1000 .. 100000000 do 1000
-	case 500 .. 1000 do 500
-	case 250 .. 500 do 250
-	case 100 .. 250 do 100
-	case 50 .. 100 do 50
-	case 25 .. 50 do 25
-	case 10 .. 25 do 10
-	case 5 .. 10 do 5
-	else 1
+let card_random := random::switch ! list(cards::Cards, ::weight, [_])
+fun random_card(Player) do
+	for I in 1 .. 50 do
+		let Class := cards::Cards[card_random() + 1]
+		print('Attempting to generate {Class}\n')
+		if let Card := Class::generate(Player) then
+			ret Card
+		end
 	end
+	error("CardError", "Failed to generate a card!")
 end
 
 glib::timeout_add(0, 1000;) do
@@ -302,22 +137,28 @@ glib::timeout_add(0, 1000;) do
 			case "Starting" do
 				Game:round := 0
 				Game:rollover := 0
+				Game:values := map(cards::AllResources;) 1
+				Game:mult := 0.0
 				State := game::state::Running
 				Countdown := Game:limit := 1
-				for Player in Players do
-					Player:points := 10
-					Player:dictionaries := 1
+				for Index, Player in Players do
+					Player:points := 100
+					Player:resources := map(cards::AllResources;) 1
 					Player:history := []
 					Player:choices := []
 					Player:choice := nil
 					Player:investments := []
-					Player:confused := nil
+					Player:effects := {}
+					Player:luck := 0.5
+					Player:random := dist::triangular(0.0, 0.5, 1.0)
 					Player:emit("round/running", {
 						"countdown" is Countdown, "limit" is Game:limit,
-						"points" is Player:points, "dictionaries" is Player:dictionaries,
+						"points" is Player:points, "resources" is Player:resources,
 						"log" is [], "round" is Game:round,
+						"values" is Game:values,
+						"index" is Index,
 						"players" is list(Game:players; Player) {
-							"points" is Player:points, "dictionaries" is Player:dictionaries
+							"points" is Player:points, "resources" is Player:resources
 						}
 					})
 				end
@@ -332,171 +173,11 @@ glib::timeout_add(0, 1000;) do
 				end
 				Game:events:empty
 				if Game:round <= 10 then
+					Game:mult := random(real) / 5
 					State := game::state::Choosing
 					Countdown := Game:limit := 10
-					let MeanPoints := stat::mean(Players, :points)
-					let MeanRate := stat::mean(Players, :dictionaries)
-					var Remaining := 4
-					loop
-						while Remaining > 0
-						let Choice := switch nil: random
-						case 0.2 do
-							let A1 := switch nil: random
-							case 5 do 0
-							case 2 do 0.1
-							case 1 do 0.2
-							case 1 do 0.3
-							end
-							let B1 := round_points(MeanPoints * random(real) / 2)
-							let A2 := switch nil: random
-							case 5 do 0
-							case 1 do 0.1
-							case 0.2 do 0.2
-							end
-							let B2 := MeanRate * random(0 .. 2) / 5
-							for Player in Players do
-								Player:choices:put(adjust_words(
-									math::ceil(A2 * Player:dictionaries + B2),
-									math::ceil(A1 * Player:points + B1)
-								))
-							end
-						case 0.3 do
-							let A1 := switch nil: random
-							case 5 do 0
-							case 2 do 0.1
-							case 1 do 0.2
-							case 1 do 0.3
-							end
-							let B1 := random(1 .. 5)
-							let A2 := switch nil: random
-							case 5 do 0
-							case 1 do 0.1
-							case 0.2 do 0.2
-							end
-							let B2 := MeanPoints * random(1 .. 3) / 4
-							for Player in Players do
-								Player:choices:put(adjust_dictionaries(
-									math::ceil(A2 * Player:points + B2),
-									math::ceil(A1 * Player:dictionaries + B1)
-								))
-							end
-						case 0.1 do
-							let Other := max2(dup(Players), :points)[1]
-							let Choice := swap_words(Other)
-							let Block := block_card(Choice)
-							for Player in Players do
-								if Player = Other then
-									Player:choices:put(Block)
-								else
-									Player:choices:put(Choice)
-								end
-							end
-							Game:events:put(;) do
-								if Other:choice = Block then
-									Choice:blocked := 1
-								end
-								nil
-							end
-						case 0.1 do
-							let Other := random(Players)
-							let Change := switch nil: random
-							case 5 do round_points(Other:points / 5)
-							case 2 do round_points(Other:points / 3)
-							case 1 do round_points(Other:points / 2)
-							end
-							let Choice := steal_words(Other, Change)
-							let Block := block_card(Choice)
-							for Player in Players do
-								if Player = Other then
-									Player:choices:put(Block)
-								else
-									Player:choices:put(Choice)
-								end
-							end
-							Game:events:put(;) do
-								if Other:choice = Block then
-									Choice:blocked := 1
-								end
-								nil
-							end
-						case 0.1 do
-							let A1 := switch nil: random
-							case 5 do 0.2
-							case 2 do 0.3
-							case 1 do 0.4
-							end
-							let B1 := round_points(MeanPoints * random(real))
-							let A2 := switch nil: random
-							case 5 do -0.3
-							case 2 do -0.4
-							case 1 do -0.5
-							end
-							let B2 := round_points(-MeanPoints * random(real) / 2)
-							for Player in Players do
-								Player:choices:put(unique_choice(
-									adjust_words(0, math::ceil(A1 * Player:points + B1)),
-									adjust_words(0, math::ceil(A2 * Player:points + B2))
-								))
-							end
-						case 0.1 do
-							let Change := math::ceil(MeanPoints * random(1 .. 3) / 4)
-							let Others := list(Players):cycle
-							for Player in Players; Other in Others do
-								Player:choices:put(steal_words(Other, Change))
-							end
-						case 0.1 do
-							let Others := list(Players):cycle
-							for Player in Players; Other in Others do
-								Player:choices:put(swap_words(Other))
-							end
-						case 0.1 do
-							let Others := list(Players):cycle
-							for Player in Players; Other in Others do
-								Player:choices:put(confuse_player(Other))
-							end
-						case 0.2 do
-							Game:rollover or next
-							let Lottery := lottery(10, Game:rollover + 100)
-							Game:rollover := nil
-							Game:events:put(;) do
-								let Entered := list(Players ->? fun(Player) Player:choice = Lottery)
-								let Winners := Lottery:winners := set(Entered ->? fun random(real) < 0.05)
-								Lottery:jackpot := old + 50 * Entered:count
-								if Winners:count = 0 then
-									Game:rollover := Lottery:jackpot
-									ret 'Nobody won the jackpot of {Lottery:jackpot} points, it rolls over to next time'
-								else
-									Game:rollover := 0
-									ret 'There were {Winners:size} winners of the jackpot of {Lottery:jackpot} points'
-								end
-							end
-							for Player in Players do
-								Player:choices:put(Lottery)
-							end
-						case 0.1 do
-							Game:round < 10 or next
-							let Reward := switch nil: random
-							case 1 do
-								adjust_words(0, round_points(MeanPoints * random(real) * 2))
-							case 1 do
-								multiply_words(random(1 .. 10))
-							case 1 do
-								swap_words(max2(dup(Players), :points)[1])
-							end
-							let Term := random(1 .. (10 - Game:round))
-							let A2 := switch nil: random
-							case 5 do 0.1
-							case 1 do 0.2
-							case 0.2 do 0.3
-							end
-							let B2 := math::ceil(MeanPoints * random(1 .. 4) / 4)
-							for Player in Players do
-								Player:choices:put(investment(math::ceil(A2 * Player:points + B2), Term, Reward))
-							end
-						end
-						Remaining:dec
-					end
-					for Player in Players do
+					for Index, Player in Players do
+						Player:choices := list(1 .. 6;) random_card(Player)
 						Player:choice := nil
 						let Choices := list(Player:choices; Choice) {
 							"name" is Choice:name,
@@ -504,14 +185,16 @@ glib::timeout_add(0, 1000;) do
 							"description" is Choice:description,
 							"cost" is Choice:cost
 						}
-						Player:confused and Choices:shuffle
+						Player:effects["confused"] and Choices:shuffle
 						Player:emit("round/choosing", {
 							"countdown" is Countdown, "limit" is Game:limit,
-							"points" is Player:points, "dictionaries" is Player:dictionaries,
+							"points" is Player:points, "resources" is Player:resources,
 							"log" is Log, "round" is Game:round,
 							"choices" is Choices,
+							"values" is Game:values,
+							"index" is Index,
 							"players" is list(Game:players; Player) {
-								"points" is Player:points, "dictionaries" is Player:dictionaries
+								"points" is Player:points, "resources" is Player:resources
 							}
 						})
 					end
@@ -521,18 +204,18 @@ glib::timeout_add(0, 1000;) do
 					for Player in Players do
 						Player:emit("round/scoring", {
 							"countdown" is Countdown, "limit" is Game:limit,
-							"points" is Player:points, "dictionaries" is Player:dictionaries,
+							"points" is Player:points, "resources" is Player:resources,
 							"log" is Log, "round" is Game:round,
 							"players" is list(Game:players; Player) {
 								"name" is Player:name,
-								"points" is Player:points, "dictionaries" is Player:dictionaries
+								"points" is Player:points, "resources" is Player:resources
 							}
 						})
 					end
 				end
 			case "Choosing" do
 				for Player in Players do
-					Player:confused := nil
+					Player:effects:delete("confused")
 				end
 				let Log := []
 				for Event in Game:events do
@@ -545,13 +228,15 @@ glib::timeout_add(0, 1000;) do
 				end
 				State := game::state::Running
 				Countdown := Game:limit := 10
-				for Player in Players do
+				for Index, Player in Players do
 					Player:emit("round/running", {
 						"countdown" is Countdown, "limit" is Game:limit,
-						"points" is Player:points, "dictionaries" is Player:dictionaries,
+						"points" is Player:points, "resources" is Player:resources,
 						"log" is Log, "round" is Game:round,
+						"values" is Game:values,
+						"index" is Index,
 						"players" is list(Game:players; Player) {
-							"points" is Player:points, "dictionaries" is Player:dictionaries
+							"points" is Player:points, "resources" is Player:resources
 						}
 					})
 				end
@@ -575,7 +260,9 @@ glib::timeout_add(0, 1000;) do
 			end
 		elseif State = game::state::Running then
 			for Player in Players do
-				Player:points := old + Player:dictionaries
+				for Resource, Amount in Player:resources do
+					Player:points := old + (Amount * Game:values[Resource])
+				end
 			end
 		end
 	on Error do

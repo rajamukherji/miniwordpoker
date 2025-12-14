@@ -1,26 +1,115 @@
-export: class: card()
+import: dist("math/dist")
 
-def Cards := {}
+export: def Cards := []
 
 def card([A], {B}) do
 	let Class := class ! (A, B)
-	Cards[Class:name] := Class
+	Cards:put(Class)
+	ret Class
 end
 
-:>-------------------------------------------------------<
-
-card: change_points(:price, :change, weight is 10, generate is; Player) do
-
+fun resources_string(Resources) do
+	Resources => (fun(Type, Count) '{Count} {Type}') join ", "
 end
 
-meth :title(Card: change_points) if Card:change > 0 then
-	'Gain {Card:change} points'
-else
-	'Lose {Card:change} points'
+export: def AllResources := set(["Red", "Green", "Blue", "Orange"])
+
+:>-------------------------------------------------------------------------------<
+
+card: buy_resource(:points, :resource, weight is 10, generate is; Player) do
+	let Game := Player:game
+	let Resource := random(AllResources)
+	let Price := math::ceil(Game:values[Resource] * 50 / (0.5 + (Player:random)()))
+	let Max := integer(Player:points / Price)
+	Max >= 1 or ret nil
+	let Amount := random(1 .. Max)
+	ret buy_resource(Price * Amount, {Resource is Amount})
 end
 
-meth :description(Card: change_points) if Card:change > 0 then
-	'Gain {Card:change} points'
-else
-	'Lose {Card:change} points'
+meth :name(Card: buy_resource) 'Buy {first(key(Card:resource))}'
+meth :image(Card: buy_resource) 'card4-01'
+meth :description(Card: buy_resource) 'Buy {resources_string(Card:resource)} for {Card:points} points.'
+meth :cost(Card: buy_resource) '{Card:points} points'
+meth :apply(Card: buy_resource, Player: any) do
+	Player:points := old - Card:points
+	for Resource, Amount in Card:resource do
+		Player:resources[Resource] := old + Amount
+	end
+	ret '{Player:name} bought {resources_string(Card:resource)} for {Card:points} points.'
+end
+
+:>-------------------------------------------------------------------------------<
+
+card: sell_resources(:resources, :points, weight is 5, generate is; Player) do
+	let Game := Player:game
+	var Points := 0
+	let Costs := {}
+	for Resource in AllResources do
+		if random(real) < 0.4 then
+			let Max := Player:resources[Resource]
+			Max >= 1 or next
+			let Price := math::ceil(Game:values[Resource] * 50 / (1.5 - (Player:random)()))
+			let Amount := random(1 .. Max)
+			Points := old + (Amount * Price)
+			Costs[Resource] := Amount
+		end
+	end
+	first(Costs) or ret nil
+	ret sell_resources(Costs, Points)
+end
+
+meth :name(Card: sell_resources) 'Sell Resources'
+meth :image(Card: sell_resources) 'card1-05'
+meth :description(Card: sell_resources) 'Sell {resources_string(Card:resources)} for {Card:points} points.'
+meth :cost(Card: sell_resources) resources_string(Card:resources)
+meth :apply(Card: sell_resources, Player: any) do
+	Player:points := old + Card:points
+	for Resource, Amount in Card:resources do
+		Player:resources[Resource] := old - Amount
+	end
+	ret '{Player:name} sold {resources_string(Card:resources)} for {Card:points} points.'
+end
+
+:>-------------------------------------------------------------------------------<
+
+card: improve_resource(:points, :resource, :amount, weight is 6, generate is; Player) do
+	let Points := 5 * math::floor(10 / (2 + (Player:random)()))
+	let Total := integer(sum(Player:resources))
+	var N := random(1 .. Total)
+	for Resource, Current in Player:resources do
+		if Current >= N then
+			let Amount := math::round(random(real), 5)
+			Amount > 0 or next
+			ret improve_resource(Points, Resource, Amount)
+		end
+		N := old - Current
+	end
+end
+
+meth :name(Card: improve_resource) 'Improve Resource'
+meth :image(Card: improve_resource) 'card4-21'
+meth :description(Card: improve_resource) 'Pay {Card:points} points to increase the efficiency of {Card:resource} by {Card:amount}.'
+meth :cost(Card: improve_resource) '{Card:points} points'
+meth :apply(Card: improve_resource, Player: any) do
+	Player:points := old - Card:points
+	let Value := Player:game:values[Card:resource] := old + Card:amount
+	ret '{Player:name} paid {Card:points} points to increase the efficiency of {Card:resource} to {Value}.'
+end
+
+:>-------------------------------------------------------------------------------<
+
+card: increase_luck(:points, weight is 4, generate is; Player) do
+	let Points := math::floor(Player:points / (2 + (Player:random)()))
+	ret increase_luck(Points)
+end
+
+meth :name(Card: increase_luck) 'Increase Luck'
+meth :image(Card: increase_luck) 'card2-14'
+meth :description(Card: increase_luck) 'Pay {Card:points} points to increase your luck.'
+meth :cost(Card: increase_luck) '{Card:points} points'
+meth :apply(Card: increase_luck, Player: any) do
+	Player:points := old - Card:points
+	Player:luck := 1.0 - (1.0 - old * 0.9)
+	Player:random := dist::triangular(0.0, Player:luck, 1.0) 
+	ret '{Player:name} paid {Card:points} points to increase their luck to {math::round(Player:luck, 1000)}.'
 end

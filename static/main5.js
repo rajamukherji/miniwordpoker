@@ -2,7 +2,8 @@ console.log("Hello world!")
 
 let socket = null;
 
-let resourcesDiv = document.getElementById("resources");
+let pointsSpan = document.getElementById("points");
+let resourcesSpan = document.getElementById("resources");
 let historyDiv = document.getElementById("history");
 let choicesDiv = document.getElementById("choices");
 let choicesDialog = document.getElementById("choices-dialog");
@@ -209,7 +210,7 @@ events["round/starting"] = function(data) {
 	gameState = "starting";
 	countdown = {message: "Starting", value: data.countdown, limit: data.limit};
 	series.forEach(s => {
-		s.data = [0];
+		s.data = [];
 	});
 	chart.setOption({series});
 };
@@ -218,8 +219,10 @@ let pointsInterval;
 
 events["round/running"] = function(data) {
 	choicesDiv.removeChildren();
-	wordsSpan.textContent = data.points.toString();
-	dictionariesSpan.textContent = data.dictionaries.toString();
+	pointsSpan.textContent = `${data.points.toString()} points, `;
+	let resources = [];
+	for (let resource in data.resources) resources.push(`${data.resources[resource]} ${resource}`);
+	resourcesSpan.textContent = resources.join(", ");
 	let rows = playersBody.children;
 	data.players.forEach((player, i) => {
 		let span = rows[i].firstChild.nextSibling.firstChild;
@@ -236,16 +239,19 @@ events["round/running"] = function(data) {
 		historyDiv.appendChild(entry);
 	});
 	historyDiv.scrollTop = historyDiv.scrollHeight;
+	let values = data.values;
 	if (pointsInterval == null) pointsInterval = setInterval(() => {
 		data.players.forEach((player, i) => {
-			player.points += player.dictionaries;
+			for (let resource in values) {
+				player.points += player.resources[resource] * values[resource];
+			}
 			let span = rows[i].firstChild.nextSibling.firstChild;
 			span.textContent = player.points.toString();
 			span.style.width = player.points + "px";
-			wordsSpan.textContent = player.points.toString();
 			series[i].data.push(player.points);
 		});
 		chart.setOption({series});
+		pointsSpan.textContent = `${data.players[data.index - 1].points.toString()} points, `;
 	}, 1000);
 	// TODO: update points over time here
 	countdown = {message: "Running", value: data.countdown, limit: data.limit};
@@ -259,8 +265,10 @@ events["round/choosing"] = function(data) {
 		historyDiv.appendChild(entry);
 	});
 	historyDiv.scrollTop = historyDiv.scrollHeight;
-	wordsSpan.textContent = data.points.toString();
-	dictionariesSpan.textContent = data.dictionaries.toString();
+	pointsSpan.textContent = `${data.points.toString()} points, `;
+	let resources = [];
+	for (let resource in data.resources) resources.push(`${data.resources[resource]} ${resource}`);
+	resourcesSpan.textContent = resources.join(", ");
 	let choices = data.choices;
 	choicesDiv.replaceChildren(choices.map((choice, index) => {
 		choice.index = index + 1;
@@ -270,7 +278,7 @@ events["round/choosing"] = function(data) {
 		description.innerHTML = choice.description;
 		choice.element = create("div.choice",
 			name,
-			create("img.image", {src: `/cards/${choice.image}.png`}),
+			create("img.image", {src: `/cards2/${choice.image}.png`}),
 			description,
 			create("div.cost", choice.cost)
 		);

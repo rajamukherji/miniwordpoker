@@ -156,22 +156,22 @@ Server:add_websocket_handler("/connect", nil, nil; Server, Message, Path, Socket
 		case "Running" do
 			send_event(Socket, "round/running", {
 				"countdown" is Game:countdown, "limit" is Game:limit,
-				"points" is Player:points, "dictionaries" is Player:dictionaries,
+				"points" is Player:points, "resources" is Player:resources,
 				"players" is list(Game:players; Player) {
-					"points" is Player:points, "dictionaries" is Player:dictionaries
+					"points" is Player:points, "resources" is Player:resources
 				}
 			})
 		case "Choosing" do
 			send_event(Socket, "round/choosing", {
 				"countdown" is Game:countdown, "limit" is Game:limit,
-				"points" is Player:points, "dictionaries" is Player:dictionaries,
+				"points" is Player:points, "resources" is Player:resources,
 				"choices" is list(Player:choices; Choice) {
 					"name" is Choice:name,
 					"description" is Choice:description,
 					"cost" is Choice:cost(Player)
 				},
 				"players" is list(Game:players; Player) {
-					"points" is Player:points, "dictionaries" is Player:dictionaries
+					"points" is Player:points, "resources" is Player:resources
 				}
 			})
 		case "Scoring" do
@@ -179,7 +179,7 @@ Server:add_websocket_handler("/connect", nil, nil; Server, Message, Path, Socket
 				"countdown" is Game:countdown, "limit" is Game:limit,
 				"players" is list(Game:players; Player) {
 					"name" is Player:name, "choices" is Player:history,
-					"points" is Player:points, "dictionaries" is Player:dictionaries
+					"points" is Player:points, "resources" is Player:resources
 				}
 			})
 		case "Ending" do
