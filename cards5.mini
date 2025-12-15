@@ -19,7 +19,7 @@ export: def AllResources := set(["Red", "Green", "Blue", "Orange"])
 card: buy_resource(:points, :resource, weight is 10, generate is; Player) do
 	let Game := Player:game
 	let Resource := random(AllResources)
-	let Price := math::ceil(Game:values[Resource] * 50 / (0.5 + (Player:random)()))
+	let Price := math::ceil(Game:values[Resource] ^ 2 * 50 / (0.5 + (Player:random)()))
 	let Max := integer(Player:points / Price)
 	Max >= 1 or ret nil
 	let Amount := random(1 .. Max)
@@ -48,7 +48,7 @@ card: sell_resources(:resources, :points, weight is 5, generate is; Player) do
 		if random(real) < 0.4 then
 			let Max := Player:resources[Resource]
 			Max >= 1 or next
-			let Price := math::ceil(Game:values[Resource] * 50 / (1.5 - (Player:random)()))
+			let Price := math::ceil(Game:values[Resource] ^ 2 * 50 / (1.5 - (Player:random)()))
 			let Amount := random(1 .. Max)
 			Points := old + (Amount * Price)
 			Costs[Resource] := Amount
@@ -87,13 +87,40 @@ card: improve_resource(:points, :resource, :amount, weight is 6, generate is; Pl
 end
 
 meth :name(Card: improve_resource) 'Improve Resource'
-meth :image(Card: improve_resource) 'card4-21'
+meth :image(Card: improve_resource) 'card5-01'
 meth :description(Card: improve_resource) 'Pay {Card:points} points to increase the efficiency of {Card:resource} by {Card:amount}.'
 meth :cost(Card: improve_resource) '{Card:points} points'
 meth :apply(Card: improve_resource, Player: any) do
 	Player:points := old - Card:points
 	let Value := Player:game:values[Card:resource] := old + Card:amount
 	ret '{Player:name} paid {Card:points} points to increase the efficiency of {Card:resource} to {Value}.'
+end
+
+:>-------------------------------------------------------------------------------<
+
+card: worsen_resource(:points, :resource, :amount, weight is 6, generate is; Player) do
+	let Game := Player:game
+	let Points := 5 * math::floor(10 / (2 + (Player:random)()))
+	let Total := integer(sum(Player:resources))
+	var N := random(1 .. Total)
+	for Resource, Current in Player:resources do
+		if Current >= N then
+			let Amount := math::round(random(real), 5)
+			Amount < Game:values[Resource] or next
+			ret worsen_resource(Points, Resource, Amount)
+		end
+		N := old - Current
+	end
+end
+
+meth :name(Card: worsen_resource) 'Worsen Resource'
+meth :image(Card: worsen_resource) 'card5-06'
+meth :description(Card: worsen_resource) 'Pay {Card:points} points to decrease the efficiency of {Card:resource} by {Card:amount}.'
+meth :cost(Card: worsen_resource) '{Card:points} points'
+meth :apply(Card: worsen_resource, Player: any) do
+	Player:points := old - Card:points
+	let Value := Player:game:values[Card:resource] := old - Card:amount
+	ret '{Player:name} paid {Card:points} points to decrease the efficiency of {Card:resource} to {Value}.'
 end
 
 :>-------------------------------------------------------------------------------<
@@ -112,4 +139,33 @@ meth :apply(Card: increase_luck, Player: any) do
 	Player:luck := 1.0 - (1.0 - old * 0.9)
 	Player:random := dist::triangular(0.0, Player:luck, 1.0) 
 	ret '{Player:name} paid {Card:points} points to increase their luck to {math::round(Player:luck, 1000)}.'
+end
+
+:>-------------------------------------------------------------------------------<
+
+card: delayed_buy_resource(:points, :resource, :delay, weight is 4, generate is; Player) do
+	let Game := Player:game
+	Game:round < 9 or ret nil
+	let Resource := random(AllResources)
+	let Delay := random(2 .. (10 - Game:round))
+	let Price := math::ceil(Game:values[Resource] ^ 2 * 50 / (0.5 + (Player:random)()) / (Delay ^ 2))
+	let Max := integer(Player:points / Price)
+	Max >= 1 or ret nil
+	let Amount := random(1 .. Max)
+	ret delayed_buy_resource(Price * Amount, {Resource is Amount}, Delay)
+end
+
+meth :name(Card: delayed_buy_resource) 'Buy {first(key(Card:resource))} in {Card:delay}'
+meth :image(Card: delayed_buy_resource) 'card1-04'
+meth :description(Card: delayed_buy_resource) 'Buy {resources_string(Card:resource)} for {Card:points} points after {Card:delay} rounds.'
+meth :cost(Card: delayed_buy_resource) '{Card:points} points'
+meth :apply(Card: delayed_buy_resource, Player: any) do
+	Player:points := old - Card:points
+	Player:invest(Card:delay;) do	
+		for Resource, Amount in Card:resource do
+			Player:resources[Resource] := old + Amount
+		end
+		ret '{Player:name} bought {resources_string(Card:resource)} for {Card:points} points.'
+	end
+	ret '{Player:name} invested {Card:points} points for {resources_string(Card:resource)} in {Card:delay} rounds.'
 end

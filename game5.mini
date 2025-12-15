@@ -115,6 +115,10 @@ meth :choose(Player: player, Index: any) do
 	ret true
 end
 
+meth :invest(Player: player, Delay: integer, Action: function) do
+	Player:investments:put((Player:game:round + Delay, Action))
+end
+
 let card_random := random::switch ! list(cards::Cards, ::weight, [_])
 fun random_card(Player) do
 	for I in 1 .. 50 do
@@ -168,7 +172,7 @@ glib::timeout_add(0, 1000;) do
 				for Player in Players do
 					Player:choices:empty
 					for (Term, Reward) in Player:investments:remove(; (Term, Reward)) Term = Game:round do
-						Log:put('{Player:name}\'s investment matured: {Reward:apply(Player)}')
+						Log:put('{Player:name}\'s investment matured: {Reward(Player)}')
 					end
 				end
 				Game:events:empty
