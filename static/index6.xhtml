@@ -11,19 +11,34 @@
 			white-space: pre-wrap;
 		}
 
+		#question {
+			font-size: 150%;
+			font-weight: bold;
+		}
+
 		#choices {
-			margin-bottom: 1em;
-			width: 90em;
-			height: 22em;
 			display: flex;
+			flex-wrap: wrap;
+			width: 100%;
+		}
+
+		#image {
+			text-align: center;
+		}
+
+		#image img {
+			height: 15em;
+			width: 18em;
 		}
 
 		.choice {
+			font-size: 150%;
 			margin: 1em;
 			border: 0.2em solid gray;
 			border-radius: 5px;
-			height: 20em;
-			width: 13em;
+			padding: 1em;
+			text-align: center;
+			width: 20em;
 		}
 
 		.positive {
@@ -53,6 +68,7 @@
 
 		.choice .description {
 			height: 6em;
+			padding: 1em;
 			border-top: 2px solid gray;
 			padding: 0.5em;
 		}
@@ -168,7 +184,9 @@
 	<dialog id="score-dialog">
 		<div id="score-table"/>
 	</dialog>
-	<dialog id="choices-dialog" style="margin-bottom: 1em;">
+	<dialog id="choices-dialog" style="max-width: 60em;">
+		<div id="image"/>
+		<div id="question"/>
 		<div id="choices"/>
 	</dialog>
 	<div id="controls">
@@ -195,6 +213,6 @@
 		</table>
 	</div>
 	<div id="logs"/>
-	<script src="/main5.js"/>
+	<script src="/main6.js"/>
 </body>
 </html>

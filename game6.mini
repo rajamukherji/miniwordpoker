@@ -4,7 +4,6 @@ import: json("fmt/json")
 import: uuid("util/uuid")
 import: stat("math/stat")
 import: dist("math/dist")
-import: cards("cards5")
 logger: log("main")
 
 :<
@@ -21,7 +20,7 @@ Game:start
 
 export: class: game(
 	:name, :owner, :password, :state, :players, :countdown, :limit,
-	:round, :history, :events, :rollover, :values, :mult,
+	:round, :history, :questions, :time,
 	
 	state is enum("Initial", "Starting", "Running", "Choosing", "Scoring", "Ending"),
 	init is fun(Game, Name, Owner, Password) do
@@ -31,12 +30,11 @@ export: class: game(
 		Game:state := game::state::Initial
 		Game:players := []
 		Game:history := []
-		Game:events := []
 	end
 )
 
-export: class: player(:name, :callback, :game, :history, :points, :resources,
-	:choices, :choice, :investments, :effects, :luck, :random,
+export: class: player(:name, :callback, :game, :points,
+	:choices, :choice, :time,
 	init is fun(Player, Name, Callback) do
 		Player:name := Name
 		Player:callback := Callback or fun(Player, Event, Data) do
@@ -57,8 +55,7 @@ meth :state(Player: player) do
 			"points" is Player:points,
 			"owner" is Game:owner = Player and true,
 			"players" is list(Game:players; Other) {
-				"name" is Other:name, "points" is Other:points,
-				"self" is Other = Player and true
+				"name" is Other:name, "points" is Other:points
 			}
 		}
 	end
@@ -67,26 +64,24 @@ end
 meth :join(Player: player, Game: game) do
 	Player:game and error("StateError", "Player already in game")
 	Player:game := Game
-	Player:points := 100
-	Player:resources := map(cards::AllResources;) 1
+	Player:points := 0
 	for Other in Game:players do
-		Other:emit("game/join", {"name" is Player:name, "points" is Player:points, "resources" is Player:resources})
+		Other:emit("game/join", {"name" is Player:name, "points" is Player:points})
 	end
 	Game:players:put(Player)
 	ret Player:state
 end
 
 let Games := []
+let Questions := json::decode(file("questions.json", "r"))
 
 meth :start(Player: player, Game: game) do
 	Game:state = game::state::Initial or error("StateError", "Invalid state")
 	Game:owner = Player or error("StateError", "Invalid owner")
 	Game:state := game::state::Starting
 	Game:countdown := Game:limit := 3
-	Game:history := []
+	Game:questions := list(Questions):shuffle
 	Game:round := 0
-	Game:events := []
-	Game:values := map(cards::AllResources;) 1
 	for Player in Game:players do
 		Player:emit("round/starting", {
 			"countdown" is Game:countdown, "limit" is Game:limit
@@ -111,23 +106,11 @@ meth :leave(Player: player, Game: game) do
 end
 
 meth :choose(Player: player, Index: any) do
-	Player:choice := Player:choices[Index{}]
+	let Choice := Player:choices[Index]
+	Player:choice = Choice and ret false
+	Player:choice := Choice
+	Player:time := time()
 	ret true
-end
-
-meth :invest(Player: player, Delay: integer, Action: function) do
-	Player:investments:put((Player:game:round + Delay, Action))
-end
-
-fun random_card(Player, choice) do
-	for I in 1 .. 50 do
-		let Class := cards::Cards[choice()]
-		print('Attempting to generate {Class}\n')
-		if let Card := Class::generate(Player) then
-			ret Card
-		end
-	end
-	error("CardError", "Failed to generate a card!")
 end
 
 glib::timeout_add(0, 1000;) do
@@ -139,111 +122,87 @@ glib::timeout_add(0, 1000;) do
 			switch State: game::state
 			case "Starting" do
 				Game:round := 0
-				Game:rollover := 0
-				Game:values := map(cards::AllResources;) 1
-				Game:mult := 0.0
 				State := game::state::Running
 				Countdown := Game:limit := 1
 				for Index, Player in Players do
-					Player:points := 100
-					Player:resources := map(cards::AllResources;) 1
-					Player:history := []
+					Player:points := 0
 					Player:choices := []
 					Player:choice := nil
-					Player:investments := []
-					Player:effects := {}
-					Player:luck := 0.5
-					Player:random := dist::triangular(0.0, 0.5, 1.0)
 					Player:emit("round/running", {
 						"countdown" is Countdown, "limit" is Game:limit,
-						"points" is Player:points, "resources" is Player:resources,
-						"log" is [], "round" is Game:round,
-						"values" is Game:values,
-						"index" is Index,
-						"players" is list(Game:players; Player) {
-							"points" is Player:points, "resources" is Player:resources
-						}
+						"points" is Player:points,
+						"round" is Game:round,
+						"players" is list(Game:players; Player) {"points" is Player:points}
 					})
 				end
 			case "Running" do
 				Game:round:inc
-				let Log := []
-				for Player in Players do
-					Player:choices:empty
-					for (Term, Reward) in Player:investments:remove(; (Term, Reward)) Term = Game:round do
-						Log:put('{Player:name}\'s investment matured: {Reward(Player)}')
-					end
-				end
-				Game:events:empty
-				if let Round := 10 >= Game:round then
-					Game:mult := random(real) / 5
+				if let Question := Game:questions[Game:round] then
 					State := game::state::Choosing
 					Countdown := Game:limit := 10
-					let choice := random::choice ! list(cards::Cards; Card) Card::weight(Round)
+					let Answers := Question["answers"]
 					for Index, Player in Players do
-						Player:choices := list(1 .. 6;) random_card(Player, choice)
 						Player:choice := nil
-						let Choices := list(Player:choices; Choice) {
-							"name" is Choice:name,
-							"image" is Choice:image,
-							"description" is Choice:description,
-							"cost" is Choice:cost
-						}
-						Player:effects["confused"] and Choices:shuffle
+						Player:choices := list(Answers):shuffle
 						Player:emit("round/choosing", {
 							"countdown" is Countdown, "limit" is Game:limit,
-							"points" is Player:points, "resources" is Player:resources,
-							"log" is Log, "round" is Game:round,
-							"choices" is Choices,
-							"values" is Game:values,
-							"index" is Index,
-							"players" is list(Game:players; Player) {
-								"points" is Player:points, "resources" is Player:resources
-							}
+							"points" is Player:points,
+							"round" is Game:round,
+							"question" is Question["question"],
+							"image" is Question["image"],
+							"choices" is Player:choices,
+							"players" is list(Game:players; Player) {"points" is Player:points}
 						})
 					end
+					Game:time := time()
 				else
 					State := game::state::Scoring
 					Countdown := Game:limit := 20
+					let FinalScores := list(Players; Player) (Player:points, Player:name)
+					FinalScores:sort
+					let History := {"round" is 'Final Scores', "log" is list(FinalScores; (Points, Name)) '{Name} scored {Points} points.'}
 					for Player in Players do
+						Player:emit("game/history", [History])
 						Player:emit("round/scoring", {
 							"countdown" is Countdown, "limit" is Game:limit,
-							"points" is Player:points, "resources" is Player:resources,
-							"log" is Log, "round" is Game:round,
+							"points" is Player:points,
+							"round" is Game:round,
 							"players" is list(Game:players; Player) {
-								"name" is Player:name,
-								"points" is Player:points, "resources" is Player:resources
+								"name" is Player:name, "points" is Player:points
 							}
 						})
 					end
+					Game:history:put(History)
 				end
 			case "Choosing" do
-				for Player in Players do
-					Player:effects:delete("confused")
-				end
 				let Log := []
-				for Event in Game:events do
-					Log:put(Event(){})
-				end
-				for Player in list(Players):shuffle do
-					if let Choice := Player:choice then
-						Log:put(Choice:apply(Player))
+				let Question := Game:questions[Game:round]
+				let Answer := Question["answers"][1]
+				Log:put('The correct answer to \"{Question["question"]}\" is \"{Answer}\"')
+				let Correct := []
+				for Player in Players do
+					if Player:choice = Answer then
+						let Time := (Player:time - Game:time) max 0
+						let Points := 10 - (Time div 1) max 6
+						Correct:put((Time, '{Player:name} took {math::round(Time, 100)}s and won {Points} points!'))
+						Player:points:inc(Points)
 					end
 				end
+				Correct:sort
+				Log:grow(Correct, _[2])
 				State := game::state::Running
-				Countdown := Game:limit := 10
+				Countdown := Game:limit := 3
+				let History := {"round" is 'Round {Game:round}', "log" is Log}
 				for Index, Player in Players do
+					Player:emit("game/history", [History])
 					Player:emit("round/running", {
 						"countdown" is Countdown, "limit" is Game:limit,
-						"points" is Player:points, "resources" is Player:resources,
-						"log" is Log, "round" is Game:round,
-						"values" is Game:values,
-						"index" is Index,
-						"players" is list(Game:players; Player) {
-							"points" is Player:points, "resources" is Player:resources
-						}
+						"points" is Player:points,
+						"round" is Game:round,
+						"players" is list(Game:players; Player) {"points" is Player:points}
 					})
 				end
+				Game:history:put(History)
 			case "Scoring" do
 				State := game::state::Ending
 				Countdown := Game:limit := 1
@@ -260,12 +219,6 @@ glib::timeout_add(0, 1000;) do
 					Player:emit("round/starting", {
 						"countdown" is Countdown,  "limit" is Game:limit
 					})
-				end
-			end
-		elseif State = game::state::Running then
-			for Player in Players do
-				for Resource, Amount in Player:resources do
-					Player:points := old + (Amount * Game:values[Resource])
 				end
 			end
 		end
