@@ -120,6 +120,8 @@ fun handle_event(Socket, Player, Event, Data) do
 		if Game:players:count = 0 then
 			Games:delete(for Id, Other in Games do until Other = Game, Id end)
 		end
+	case "game/rename" do
+		Player:name := Data["name"]
 	case "round/choose" do
 		send_event(Socket, "round/choose", Player:choose(Data["choice"]))
 	end
@@ -156,7 +158,10 @@ Server:add_websocket_handler("/connect", nil, nil; Server, Message, Path, Socket
 				"countdown" is Game:countdown, "limit" is Game:limit,
 				"points" is Player:points,
 				"round" is Game:round,
-				"players" is list(Game:players; Player) {"points" is Player:points}
+				"players" is list(Game:players; Player) {
+					"name" is Player:name,
+					"points" is Player:points
+				}
 			})
 		case "Choosing" do
 			let Question := Game:questions[Game:round]
@@ -167,20 +172,27 @@ Server:add_websocket_handler("/connect", nil, nil; Server, Message, Path, Socket
 				"question" is Question["question"],
 				"image" is Question["image"],
 				"choices" is Player:choices,
-				"players" is list(Game:players; Player) {"points" is Player:points}
+				"players" is list(Game:players; Player) {
+					"name" is Player:name, 
+					"points" is Player:points
+				}
 			})
 		case "Scoring" do
 			send_event(Socket, "round/scoring", {
 				"countdown" is Game:countdown, "limit" is Game:limit,
 				"round" is Game:round,
 				"players" is list(Game:players; Player) {
-					"name" is Player:name, "points" is Player:points
+					"name" is Player:name,
+					"points" is Player:points
 				}
 			})
 		case "Ending" do
 			send_event(Socket, "round/ending", {
 				"countdown" is Game:countdown, "limit" is Game:limit,
-				"players" is list(Players; Player) {"points" is Player:points}
+				"players" is list(Players; Player) {
+					"name" is Player:name, 
+					"points" is Player:points
+				}
 			})
 		end
 	end

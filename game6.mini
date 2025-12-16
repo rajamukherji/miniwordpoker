@@ -132,7 +132,10 @@ glib::timeout_add(0, 1000;) do
 						"countdown" is Countdown, "limit" is Game:limit,
 						"points" is Player:points,
 						"round" is Game:round,
-						"players" is list(Game:players; Player) {"points" is Player:points}
+						"players" is list(Game:players; Player) {
+							"name" is Player:name, 
+							"points" is Player:points
+						}
 					})
 				end
 			case "Running" do
@@ -151,7 +154,10 @@ glib::timeout_add(0, 1000;) do
 							"question" is Question["question"],
 							"image" is Question["image"],
 							"choices" is Player:choices,
-							"players" is list(Game:players; Player) {"points" is Player:points}
+							"players" is list(Game:players; Player) {
+								"name" is Player:name,
+								"points" is Player:points
+							}
 						})
 					end
 					Game:time := time()
@@ -168,7 +174,8 @@ glib::timeout_add(0, 1000;) do
 							"points" is Player:points,
 							"round" is Game:round,
 							"players" is list(Game:players; Player) {
-								"name" is Player:name, "points" is Player:points
+								"name" is Player:name,
+								"points" is Player:points
 							}
 						})
 					end
@@ -199,7 +206,10 @@ glib::timeout_add(0, 1000;) do
 						"countdown" is Countdown, "limit" is Game:limit,
 						"points" is Player:points,
 						"round" is Game:round,
-						"players" is list(Game:players; Player) {"points" is Player:points}
+						"players" is list(Game:players; Player) {
+							"name" is Player:name,
+							"points" is Player:points
+						}
 					})
 				end
 				Game:history:put(History)
@@ -209,7 +219,10 @@ glib::timeout_add(0, 1000;) do
 				for Player in Players do
 					Player:emit("round/ending", {
 						"countdown" is Countdown, "limit" is Game:limit,
-						"players" is list(Players; Player) {"points" is Player:points}
+						"players" is list(Players; Player) {
+							"name" is Player:name,
+							"points" is Player:points
+						}
 					})
 				end
 			case "Ending" do

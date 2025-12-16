@@ -260,7 +260,7 @@ events["round/choosing"] = function(data) {
 	pointsSpan.textContent = `You have ${data.points.toString()} points`;
 	questionDiv.replaceChildren(data.question);
 	if (data.image) {
-		imageDiv.replaceChildren(create("img", {src: `/questions/${data.image}.png`}));
+		imageDiv.replaceChildren(create("img", {src: `/questions/${data.image}`}));
 	} else {
 		imageDiv.removeChildren();
 	}
