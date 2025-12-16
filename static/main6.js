@@ -139,11 +139,11 @@ events["game/list"] = function(data) {
 };
 
 let ticks = [];
-for (let i = 0; i < 30; ++i) ticks.push(i);
+//for (let i = 0; i < 35; ++i) ticks.push(i);
 chart.setOption({
 	textStyle: {fontSize: "20px", color: "white", textShadowColor: "white"},
 	animationDuration: 100,
-	grid: {left: "10px", right: "10px", top: "10px", bottom: "10px"},
+	grid: {left: "10px", right: "100px", top: "10px", bottom: "10px"},
 	xAxis: {type: 'category', data: ticks, axisLabel: {fontSize: "20px", color: "white"}},
 	yAxis: {type: 'value', axisLabel: {fontSize: "20px", color: "white"}, splitLine: {lineStyle: {color: "#777"}}}
 });
@@ -164,15 +164,39 @@ events["game/join"] = function(data) {
 				create("td", create("span.name", player.name)),
 				create("td", create("span.points", {style: `width:${player.points * 10}px`}, player.points.toString()))
 			));
-			series.push({name: player.name, type: 'line', data: [], showSymbol: true, endLabel: {show: true, formatter: '{a}: {c}', color: "white"}});
+			if (data.state == "Running") player.scores.push(player.points);
+			series.push({name: player.name, type: 'line', data: player.scores, showSymbol: true, endLabel: {show: true, formatter: '{a}: {c}', color: "white"}});
 		});
+		for (let i = 0; i < data.round; ++i) ticks.push(i);
+		if (data.state == "Running") ticks.push(data.round);
+		chart.setOption({xAxis: {data: ticks}, series});
 		if (data.countdown) countdown = {message: data.state, value: data.countdown, limit: data.limit};
+		if (data.state == "Choosing") {
+			questionDiv.replaceChildren(data.question);
+			if (data.image) {
+				imageDiv.replaceChildren(create("img", {src: `/questions/${data.image}`}));
+			} else {
+				imageDiv.removeChildren();
+			}
+			let choices = data.choices.map(answer => { return {answer}; });
+			choicesDiv.replaceChildren(choices.map((choice, index) => {
+				choice.index = index + 1;
+				choice.element = create("div.choice", choice.answer);
+				choice.element.onclick = function(event) {
+					choices.forEach(choice => choice.element.removeClass("selected"));
+					choice.element.addClass("selected");
+					send("round/choose", {choice: choice.index});
+				};
+				return choice.element;
+			}));
+			choicesDialog.showModal();
+		}
 	} else {
 		playersBody.appendChild(create("tr",
 			create("td", create("span.name", data.name)),
 			create("td", create("span.points", {style: `width:${data.points * 10}px`}, data.points.toString()))
 		));
-		series.push({name: data.name, type: 'line', data: [], showSymbol: true, endLabel: {show: true, formatter: '{a}: {c}', color: "white"}});
+		series.push({name: data.name, type: 'line', data: data.scores, showSymbol: true, endLabel: {show: true, formatter: '{a}: {c}', color: "white"}});
 	}
 	chart.setOption({series});
 };
@@ -180,8 +204,9 @@ events["game/join"] = function(data) {
 events["game/leave"] = function(data) {
 	if (data.player) {
 		let rows = playersBody.children;
-		if (rows.length >= data.player) rows[data.player - 1].remove();
+		rows[data.player - 1].remove();
 		series.splice(data.player - 1, 1);
+		chart.setOption({series});
 	} else {
 		createButton.style.display = null;
 		joinButton.style.display = null;
@@ -189,6 +214,9 @@ events["game/leave"] = function(data) {
 		startButton.style.display = "none";
 		playersBody.removeChildren();
 		countdown = null;
+		series = [];
+		ticks = [];
+		chart.setOption({xAxis: {data: ticks}, series});
 	}
 }
 
@@ -220,8 +248,11 @@ events["game/state"] = function(data) {
 			create("td", create("span.name", player.name)),
 			create("td", create("span.points", {style: `width:${player.points * 10}px`}, player.points.toString()))
 		));
-		series.push({name: player.name, type: 'line', data: [], showSymbol: true, endLabel: {show: true, formatter: '{a}: {c}', color: "white"}});
+		let scores = player.scores;
+		series.push({name: player.name, type: 'line', data: scores, showSymbol: true, endLabel: {show: true, formatter: '{a}: {c}', color: "white"}});
 	});
+	for (let i = 0; i < data.round; ++i) ticks.push(i);
+	chart.setOption({xAxis: {data: ticks}, series});
 };
 
 events["round/starting"] = function(data) {
@@ -245,7 +276,8 @@ events["round/running"] = function(data) {
 		series[i].name = player.name;
 		series[i].data.push(player.points);
 	});
-	chart.setOption({series});
+	ticks.push(data.round);
+	chart.setOption({xAxis: {data: ticks}, series});
 	countdown = {message: "Running", value: data.countdown, limit: data.limit};
 	choicesDialog.close();
 };
@@ -319,7 +351,9 @@ events["round/scoring"] = function(data) {
 		let span = rows[i].firstChild.nextSibling.firstChild;
 		span.textContent = player.points.toString();
 		span.style.width = (player.points * 10) + "px";
+		series[i].name = player.name;
 	})
+	chart.setOption({series});
 	let scores = data.players.map(resultRow);
 	scoreTable.style.height = (scores.length * 38) + 20 + "px";
 	scoreTable.replaceChildren(scores.map(score => score.element));

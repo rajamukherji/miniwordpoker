@@ -30,11 +30,12 @@ export: class: game(
 		Game:state := game::state::Initial
 		Game:players := []
 		Game:history := []
+		Game:round := 0
 	end
 )
 
 export: class: player(:name, :callback, :game, :points,
-	:choices, :choice, :time,
+	:choices, :choice, :time, :scores,
 	init is fun(Player, Name, Callback) do
 		Player:name := Name
 		Player:callback := Callback or fun(Player, Event, Data) do
@@ -49,15 +50,24 @@ end
 
 meth :state(Player: player) do
 	if let Game := Player:game then
-		ret {
+		let State := {
 			"name" is Game:name, "state" is string(Game:state),
 			"countdown" is Game:countdown, "limit" is Game:limit,
-			"points" is Player:points,
+			"points" is Player:points, "round" is Game:round,
 			"owner" is Game:owner = Player and true,
 			"players" is list(Game:players; Other) {
-				"name" is Other:name, "points" is Other:points
+				"name" is Other:name,
+				"points" is Other:points,
+				"scores" is Other:scores
 			}
 		}
+		if Game:state = game::state::Choosing then
+			let Question := Game:questions[Game:round]
+			State["question"] := Question["question"]
+			State["image"] := Question["image"]
+			State["choices"] := Player:choices
+		end
+		ret State
 	end
 end
 
@@ -65,9 +75,23 @@ meth :join(Player: player, Game: game) do
 	Player:game and error("StateError", "Player already in game")
 	Player:game := Game
 	Player:points := 0
-	for Other in Game:players do
-		Other:emit("game/join", {"name" is Player:name, "points" is Player:points})
+	Player:scores := list(1 .. Game:round;) 0
+	let Update := {
+		"name" is Player:name,
+		"points" is Player:points,
+		"scores" is if Game:state = game::state::Running then
+			Player:scores + [Player:points]
+		else
+			Player:scores
+		end
+	}
+	if Game:state = game::state::Choosing then
+		let Question := Game:questions[Game:round]
+		let Answers := Question["answers"]
+		Player:choice := nil
+		Player:choices := list(Answers):shuffle
 	end
+	for Other in Game:players do Other:emit("game/join", Update) end
 	Game:players:put(Player)
 	ret Player:state
 end
@@ -123,11 +147,12 @@ glib::timeout_add(0, 1000;) do
 			case "Starting" do
 				Game:round := 0
 				State := game::state::Running
-				Countdown := Game:limit := 1
+				Countdown := Game:limit := 10
 				for Index, Player in Players do
 					Player:points := 0
 					Player:choices := []
 					Player:choice := nil
+					Player:scores := []
 					Player:emit("round/running", {
 						"countdown" is Countdown, "limit" is Game:limit,
 						"points" is Player:points,
@@ -140,6 +165,9 @@ glib::timeout_add(0, 1000;) do
 				end
 			case "Running" do
 				Game:round:inc
+				for Player in Players do
+					Player:scores:put(Player:points)
+				end
 				if let Question := Game:questions[Game:round] then
 					State := game::state::Choosing
 					Countdown := Game:limit := 15
@@ -187,16 +215,23 @@ glib::timeout_add(0, 1000;) do
 				let Answer := Question["answers"][1]
 				Log:put('The correct answer to \"{Question["question"]}\" is \"{Answer}\"')
 				let Correct := []
-				for Player in Players do
-					if Player:choice = Answer then
-						let Time := (Player:time - Game:time) max 0
-						let Points := 10 - (Time div 1) max 6
-						Correct:put((Time, '{Player:name} took {math::round(Time, 100)}s and won {Points} points!'))
-						Player:points:inc(Points)
+				if Question["answers"]:length > 1 then
+					for Player in Players do
+						if Player:choice = Answer then
+							let Time := (Player:time - Game:time) max 0
+							let Points := 10 - (Time div 1) max 6
+							Correct:put((Time, '{Player:name} took {math::round(Time, 100)}s and won {Points} points!'))
+							Player:points:inc(Points)
+						end
 					end
+					Correct:sort
+					Log:grow(Correct, _[2])
+				else
+					for Player in Players do
+						Player:points:inc(10)
+					end
+					Log:put("That was a joke question, 10 points for everyone!")
 				end
-				Correct:sort
-				Log:grow(Correct, _[2])
 				State := game::state::Running
 				Countdown := Game:limit := 10
 				let History := {"round" is 'Round {Game:round}', "log" is Log}
@@ -208,7 +243,8 @@ glib::timeout_add(0, 1000;) do
 						"round" is Game:round,
 						"players" is list(Game:players; Player) {
 							"name" is Player:name,
-							"points" is Player:points
+							"points" is Player:points,
+							"scores" is Player:scores
 						}
 					})
 				end
