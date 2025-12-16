@@ -80,7 +80,7 @@ meth :start(Player: player, Game: game) do
 	Game:owner = Player or error("StateError", "Invalid owner")
 	Game:state := game::state::Starting
 	Game:countdown := Game:limit := 3
-	Game:questions := list(Questions):shuffle
+	Game:questions := Questions
 	Game:round := 0
 	for Player in Game:players do
 		Player:emit("round/starting", {
