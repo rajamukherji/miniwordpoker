@@ -35,11 +35,12 @@
 		.choice {
 			font-size: 150%;
 			margin: 1em;
-			border: 0.2em solid gray;
+			border: 0.15em solid black;
 			border-radius: 5px;
 			padding: 1em;
 			text-align: center;
 			width: 20em;
+			background: white;
 		}
 
 		.positive {
@@ -85,6 +86,7 @@
 			border: 0.2em solid blue;
 			box-shadow: 0 0 6px blue;
 			color: blue;
+			text-decoration: underline;
 		}
 
 		#side {
@@ -107,7 +109,10 @@
 
 		.points {
 			display: inline-block;
-			background: yellow;
+			background: blue;
+			border-radius: 1em;
+			padding: 0 0.5em;
+			text-align: right;
 			transition: all 1s ease;
 		}
 
@@ -145,10 +150,11 @@
 		}
 
 		#chart {
-			border: 3px double black;
 			height: 800px;
 			width: 60%;
 			flex: 60% 0 1;
+			border: 3px solid #64341d;
+			background: #332B2BC0;
 		}
 
 		#display {
@@ -158,13 +164,15 @@
 
 		#history {
 			padding: 1em;
-			border: 3px double black;
+			border: 3px solid #64341d;
 			width: 100%;
 			height: 800px;
 			overflow: auto;
 			flex: 1;
 			margin-left: 10px;
 			font-size: 110%;
+			font-weight: bold;
+			background: #332B2BC0;
 		}
 
 		th {
@@ -173,6 +181,24 @@
 
 		th, td {
 			padding: 0.25em;
+		}
+
+		#headline {
+			text-align: center;
+			font-size: 150%;
+			line-height: 2em;
+		}
+
+		#countdown-progress {
+			border: 1px solid white;
+		}
+
+		body {
+			background-image: url(background.png);
+			background-size: cover;
+			background-color: rgba(255, 255, 255, 0.9); /* Semi-transparent white color */
+			background-blend-mode: multiply;
+			color: white;
 		}
 	</style>
 	<script src="/lib.js" type="text/javascript"/>
@@ -185,12 +211,13 @@
 	<dialog id="score-dialog">
 		<div id="score-table"/>
 	</dialog>
-	<dialog id="choices-dialog" style="max-width: 60em;">
+	<dialog id="choices-dialog" style="max-width: 60em; background: lightyellow;">
 		<div id="image"/>
 		<div id="question"/>
 		<div id="choices"/>
 	</dialog>
 	<div id="controls">
+		<button id="name-button">Change Name</button>
 		<button id="create-button">Create Game</button>
 		<button id="join-button">Join Game</button>
 		<button id="start-button">Start Game</button>
@@ -202,7 +229,7 @@
 				<span id="countdown-message"/>
 				<progress id="countdown-progress"/>
 			</div>
-			<div><span id="points"/><span id="resources"/></div>
+			<div id="headline"><span id="name"/>: <span id="points"/></div>
 		</div>
 		<div id="display">
 			<div id="chart"/>

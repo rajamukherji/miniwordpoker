@@ -2,6 +2,7 @@ console.log("Hello world!")
 
 let socket = null;
 
+let nameSpan = document.getElementById("name");
 let pointsSpan = document.getElementById("points");
 let historyDiv = document.getElementById("history");
 let imageDiv = document.getElementById("image");
@@ -9,6 +10,7 @@ let questionDiv = document.getElementById("question");
 let choicesDiv = document.getElementById("choices");
 let choicesDialog = document.getElementById("choices-dialog");
 
+let nameButton = document.getElementById("name-button");
 let createButton = document.getElementById("create-button");
 let joinButton = document.getElementById("join-button");
 let startButton = document.getElementById("start-button");
@@ -23,7 +25,7 @@ let countdownSpan = document.getElementById("countdown-message");
 let countdownProgress = document.getElementById("countdown-progress");
 let countdown;
 
-let chart = echarts.init(document.getElementById("chart"));
+let chart = echarts.init(document.getElementById("chart"), "macarons");
 
 let id = sessionStorage.getItem("id");
 if (id === null) {
@@ -36,6 +38,16 @@ let name = sessionStorage.getItem("name");
 if (name === null) {
 	name = prompt("Player Name");
 	sessionStorage.setItem("name", name);
+	nameSpan.textContent = name;
+} else {
+	nameSpan.textContent = name;
+}
+
+nameButton.onclick = function() {
+	name = prompt("Player Name");
+	sessionStorage.setItem("name", name);
+	nameSpan.textContent = name;
+	send("game/rename", {name: name});
 }
 
 let events = {};
@@ -127,13 +139,13 @@ events["game/list"] = function(data) {
 };
 
 let ticks = [];
-for (let i = 0; i < 120; ++i) ticks.push(i);
+for (let i = 0; i < 30; ++i) ticks.push(i);
 chart.setOption({
-	textStyle: {fontSize: "20px"},
+	textStyle: {fontSize: "20px", color: "white", textShadowColor: "white"},
 	animationDuration: 100,
-	grid: {left: 0, right: 0, top: "10px", bottom: "10px"},
-	xAxis: {type: 'category', data: ticks},
-	yAxis: {type: 'value'}
+	grid: {left: "10px", right: "10px", top: "10px", bottom: "10px"},
+	xAxis: {type: 'category', data: ticks, axisLabel: {fontSize: "20px", color: "white"}},
+	yAxis: {type: 'value', axisLabel: {fontSize: "20px", color: "white"}, splitLine: {lineStyle: {color: "#777"}}}
 });
 let series = [];
 
@@ -147,20 +159,20 @@ events["game/join"] = function(data) {
 		if (data.owner && data.state === "Initial") startButton.style.display = null;
 		data.players.forEach(player => {
 			let attrs = {};
-			if (player.self) attrs["style"] = "font-weight:bold;color:red;";
-			playersBody.appendChild(create("tr",
-				create("td", attrs, player.name),
-				create("td", attrs, create("span.points", {style: `width:${player.points * 10}px`}, player.points.toString()))
+			if (player.self) attrs["class"] = "self";
+			playersBody.appendChild(create("tr", attrs,
+				create("td", create("span.name", player.name)),
+				create("td", create("span.points", {style: `width:${player.points * 10}px`}, player.points.toString()))
 			));
-			series.push({name: player.name, type: 'line', data: [], showSymbol: false, endLabel: {show: true, formatter: '{a}: {c}'}});
+			series.push({name: player.name, type: 'line', data: [], showSymbol: true, endLabel: {show: true, formatter: '{a}: {c}', color: "white"}});
 		});
 		if (data.countdown) countdown = {message: data.state, value: data.countdown, limit: data.limit};
 	} else {
 		playersBody.appendChild(create("tr",
-			create("td", data.name),
+			create("td", create("span.name", data.name)),
 			create("td", create("span.points", {style: `width:${data.points * 10}px`}, data.points.toString()))
 		));
-		series.push({name: data.name, type: 'line', data: [], showSymbol: false, endLabel: {show: true, formatter: '{a}: {c}'}});
+		series.push({name: data.name, type: 'line', data: [], showSymbol: true, endLabel: {show: true, formatter: '{a}: {c}', color: "white"}});
 	}
 	chart.setOption({series});
 };
@@ -203,12 +215,12 @@ events["game/state"] = function(data) {
 	series = [];
 	data.players.forEach(player => {
 		let attrs = {};
-		if (player.self) attrs["style"] = "font-weight:bold;color:red;";
-		playersBody.appendChild(create("tr",
-			create("td", attrs, player.name),
-			create("td", attrs, create("span.points", {style: `width:${player.points * 10}px`}, player.points.toString()))
+		if (player.self) attrs["class"] = "self";
+		playersBody.appendChild(create("tr", attrs,
+			create("td", create("span.name", player.name)),
+			create("td", create("span.points", {style: `width:${player.points * 10}px`}, player.points.toString()))
 		));
-		series.push({name: player.name, type: 'line', data: [], showSymbol: false, endLabel: {show: true, formatter: '{a}: {c}'}});
+		series.push({name: player.name, type: 'line', data: [], showSymbol: true, endLabel: {show: true, formatter: '{a}: {c}', color: "white"}});
 	});
 };
 
@@ -226,9 +238,11 @@ events["round/running"] = function(data) {
 	pointsSpan.textContent = `You have ${data.points.toString()} points`;
 	let rows = playersBody.children;
 	data.players.forEach((player, i) => {
+		rows[i].firstChild.firstChild.textContent = player.name;
 		let span = rows[i].firstChild.nextSibling.firstChild;
 		span.textContent = player.points.toString();
 		span.style.width = (player.points * 10) + "px";
+		series[i].name = player.name;
 		series[i].data.push(player.points);
 	});
 	chart.setOption({series});
@@ -264,10 +278,10 @@ events["round/choosing"] = function(data) {
 	choicesDialog.showModal();
 	let rows = playersBody.children;
 	data.players.forEach((player, i) => {
+		rows[i].firstChild.firstChild.textContent = player.name;
 		let span = rows[i].firstChild.nextSibling.firstChild;
 		span.textContent = player.points.toString();
 		span.style.width = (player.points * 10) + "px";
-		series[i].data.push(player.points);
 	});
 	chart.setOption({series});
 	countdown = {message: "Choosing", value: data.countdown, limit: data.limit};

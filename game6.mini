@@ -139,7 +139,7 @@ glib::timeout_add(0, 1000;) do
 				Game:round:inc
 				if let Question := Game:questions[Game:round] then
 					State := game::state::Choosing
-					Countdown := Game:limit := 10
+					Countdown := Game:limit := 15
 					let Answers := Question["answers"]
 					for Index, Player in Players do
 						Player:choice := nil
@@ -157,7 +157,7 @@ glib::timeout_add(0, 1000;) do
 					Game:time := time()
 				else
 					State := game::state::Scoring
-					Countdown := Game:limit := 20
+					Countdown := Game:limit := 240
 					let FinalScores := list(Players; Player) (Player:points, Player:name)
 					FinalScores:sort
 					let History := {"round" is 'Final Scores', "log" is list(FinalScores; (Points, Name)) '{Name} scored {Points} points.'}
@@ -191,7 +191,7 @@ glib::timeout_add(0, 1000;) do
 				Correct:sort
 				Log:grow(Correct, _[2])
 				State := game::state::Running
-				Countdown := Game:limit := 3
+				Countdown := Game:limit := 10
 				let History := {"round" is 'Round {Game:round}', "log" is Log}
 				for Index, Player in Players do
 					Player:emit("game/history", [History])
