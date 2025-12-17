@@ -22,7 +22,7 @@ export: class: game(
 	:name, :owner, :password, :state, :players, :countdown, :limit,
 	:round, :history, :questions, :time,
 	
-	state is enum("Initial", "Starting", "Running", "Choosing", "Scoring", "Ending"),
+	state is enum("Initial", "Starting", "Running", "Choosing", "Marking", "Scoring", "Ending"),
 	init is fun(Game, Name, Owner, Password) do
 		Game:name := Name
 		Game:owner := Owner
@@ -147,7 +147,7 @@ glib::timeout_add(0, 1000;) do
 			case "Starting" do
 				Game:round := 0
 				State := game::state::Running
-				Countdown := Game:limit := 10
+				Countdown := Game:limit := 5
 				for Index, Player in Players do
 					Player:points := 0
 					Player:choices := []
@@ -232,11 +232,32 @@ glib::timeout_add(0, 1000;) do
 					end
 					Log:put("That was a joke question, 10 points for everyone!")
 				end
-				State := game::state::Running
+				State := game::state::Marking
 				Countdown := Game:limit := 10
 				let History := {"round" is 'Round {Game:round}', "log" is Log}
 				for Index, Player in Players do
 					Player:emit("game/history", [History])
+					Player:emit("round/marking", {
+						"countdown" is Countdown, "limit" is Game:limit,
+						"points" is Player:points,
+						"round" is Game:round,
+						"question" is Question["question"],
+						"image" is Question["image"],
+						"choices" is Player:choices,
+						"choice" is Player:choice,
+						"answer" is Question["answers"][1],
+						"players" is list(Game:players; Player) {
+							"name" is Player:name,
+							"points" is Player:points,
+							"scores" is Player:scores
+						}
+					})
+				end
+				Game:history:put(History)
+			case "Marking" do
+				State := game::state::Running
+				Countdown := Game:limit := 5
+				for Index, Player in Players do
 					Player:emit("round/running", {
 						"countdown" is Countdown, "limit" is Game:limit,
 						"points" is Player:points,
@@ -248,7 +269,6 @@ glib::timeout_add(0, 1000;) do
 						}
 					})
 				end
-				Game:history:put(History)
 			case "Scoring" do
 				State := game::state::Ending
 				Countdown := Game:limit := 1

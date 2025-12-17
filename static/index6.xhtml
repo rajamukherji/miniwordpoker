@@ -84,9 +84,28 @@
 
 		.choice.selected {
 			border: 0.2em solid blue;
-			box-shadow: 0 0 6px blue;
+			outline: 6px blue;
 			color: blue;
-			text-decoration: underline;
+			font-weight: bold;
+		}
+
+		.choice.correct {
+			border: 0.2em solid green;
+			outline: 6px green;
+			color: green;
+			font-weight: bold;
+		}
+
+		.choice.incorrect {
+			border: 0.2em solid red;
+			outline: 6px red;
+			color: red;
+			font-weight: bold;
+		}
+
+		.choice.other {
+			border: 0.2em solid lightgrey;
+			color: lightgrey;
 		}
 
 		#side {

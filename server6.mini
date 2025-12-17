@@ -177,6 +177,22 @@ Server:add_websocket_handler("/connect", nil, nil; Server, Message, Path, Socket
 					"points" is Player:points
 				}
 			})
+		case "Marking" do
+			let Question := Game:questions[Game:round]
+			send_event(Socket, "round/marking", {
+				"countdown" is Game:countdown, "limit" is Game:limit,
+				"points" is Player:points,
+				"round" is Game:round,
+				"question" is Question["question"],
+				"image" is Question["image"],
+				"choices" is Player:choices,
+				"choice" is Player:choice,
+				"answer" is Question["answers"][1],
+				"players" is list(Game:players; Player) {
+					"name" is Player:name, 
+					"points" is Player:points
+				}
+			})
 		case "Scoring" do
 			send_event(Socket, "round/scoring", {
 				"countdown" is Game:countdown, "limit" is Game:limit,

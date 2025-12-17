@@ -190,6 +190,26 @@ events["game/join"] = function(data) {
 				return choice.element;
 			}));
 			choicesDialog.showModal();
+		} else if (data.state == "Marking") {
+			questionDiv.replaceChildren(data.question);
+			if (data.image) {
+				imageDiv.replaceChildren(create("img", {src: `/questions/${data.image}`}));
+			} else {
+				imageDiv.removeChildren();
+			}
+			let choices = data.choices.map(answer => { return {answer}; });
+			choicesDiv.replaceChildren(choices.map((choice, index) => {
+				choice.index = index + 1;
+				if (choice.answer == data.answer) {
+					choice.element = create("div.choice.correct", choice.answer);
+				} else if (choice.answer == data.choice) {
+					choice.element = create("div.choice.incorrect", choice.answer);
+				} else {
+					choice.element = create("div.choice.other", choice.answer);
+				}
+				return choice.element;
+			}));
+			choicesDialog.showModal();
 		}
 	} else {
 		playersBody.appendChild(create("tr",
@@ -223,7 +243,7 @@ events["game/leave"] = function(data) {
 function updateCountdown() {
 	if (countdown) {
 		let value = (countdown.value -= 0.1);
-		countdownSpan.textContent = `${countdown.message} for ${value.toFixed(1)}s ...`;
+		countdownSpan.textContent = `${countdown.message} for ${value.toFixed(0)}s ...`;
 		countdownProgress.max = countdown.limit;
 		countdownProgress.value = value;
 	}
@@ -320,6 +340,44 @@ events["round/choosing"] = function(data) {
 };
 
 events["round/choose"] = function(data) {
+};
+
+events["round/marking"] = function(data) {
+	if (data.log) data.log.forEach(log => {
+		let entry = create("div", {"class": "log"});
+		entry.innerHTML = log;
+		historyDiv.appendChild(entry);
+	});
+	historyDiv.scrollTop = historyDiv.scrollHeight;
+	pointsSpan.textContent = `You have ${data.points.toString()} points`;
+	questionDiv.replaceChildren(data.question);
+	if (data.image) {
+		imageDiv.replaceChildren(create("img", {src: `/questions/${data.image}`}));
+	} else {
+		imageDiv.removeChildren();
+	}
+	let choices = data.choices.map(answer => { return {answer}; });
+	choicesDiv.replaceChildren(choices.map((choice, index) => {
+		choice.index = index + 1;
+		if (choice.answer == data.answer) {
+			choice.element = create("div.choice.correct", choice.answer);
+		} else if (choice.answer == data.choice) {
+			choice.element = create("div.choice.incorrect", choice.answer);
+		} else {
+			choice.element = create("div.choice.other", choice.answer);
+		}
+		return choice.element;
+	}));
+	choicesDialog.showModal();
+	let rows = playersBody.children;
+	data.players.forEach((player, i) => {
+		rows[i].firstChild.firstChild.textContent = player.name;
+		let span = rows[i].firstChild.nextSibling.firstChild;
+		span.textContent = player.points.toString();
+		span.style.width = (player.points * 5) + "px";
+	});
+	chart.setOption({series});
+	countdown = {message: "Marking", value: data.countdown, limit: data.limit};
 };
 
 function resultRow(player, i) {
