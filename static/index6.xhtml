@@ -112,8 +112,13 @@
 			background: blue;
 			border-radius: 1em;
 			padding: 0 0.5em;
+			min-width: 2em;
 			text-align: right;
 			transition: all 1s ease;
+		}
+
+		#score-dialog {
+			background: antiquewhite;
 		}
 
 		#score-table {
@@ -127,18 +132,29 @@
 			font-size: 120%;
 		}
 
-		.score-row > .name {
+		.score-row > .position {
 			display: inline-block;
-			width: 6em;
+			width: 2em;
 			font-weight: bold;
 			vertical-align: middle;
 		}
 
-		.score-row > .points {
+		.score-row > .name {
 			display: inline-block;
-			width: 3em;
+			width: 10em;
+			font-weight: bold;
+			vertical-align: middle;
+		}
+
+		.score-row > .score {
+			display: inline-block;
 			text-align: right;
 			vertical-align: middle;
+			background: red;
+			padding: 0 0.5em;
+			min-width: 2em;
+			border-radius: 1em;
+			color: white;
 		}
 
 		#current-points {

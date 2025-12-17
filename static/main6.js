@@ -162,7 +162,7 @@ events["game/join"] = function(data) {
 			if (player.self) attrs["class"] = "self";
 			playersBody.appendChild(create("tr", attrs,
 				create("td", create("span.name", player.name)),
-				create("td", create("span.points", {style: `width:${player.points * 10}px`}, player.points.toString()))
+				create("td", create("span.points", {style: `width:${player.points * 5}px`}, player.points.toString()))
 			));
 			if (data.state == "Running") player.scores.push(player.points);
 			series.push({name: player.name, type: 'line', data: player.scores, showSymbol: true, endLabel: {show: true, formatter: '{a}: {c}', color: "white"}});
@@ -246,7 +246,7 @@ events["game/state"] = function(data) {
 		if (player.self) attrs["class"] = "self";
 		playersBody.appendChild(create("tr", attrs,
 			create("td", create("span.name", player.name)),
-			create("td", create("span.points", {style: `width:${player.points * 10}px`}, player.points.toString()))
+			create("td", create("span.points", {style: `width:${player.points * 5}px`}, player.points.toString()))
 		));
 		let scores = player.scores;
 		series.push({name: player.name, type: 'line', data: scores, showSymbol: true, endLabel: {show: true, formatter: '{a}: {c}', color: "white"}});
@@ -272,7 +272,7 @@ events["round/running"] = function(data) {
 		rows[i].firstChild.firstChild.textContent = player.name;
 		let span = rows[i].firstChild.nextSibling.firstChild;
 		span.textContent = player.points.toString();
-		span.style.width = (player.points * 10) + "px";
+		span.style.width = (player.points * 5) + "px";
 		series[i].name = player.name;
 		series[i].data.push(player.points);
 	});
@@ -313,7 +313,7 @@ events["round/choosing"] = function(data) {
 		rows[i].firstChild.firstChild.textContent = player.name;
 		let span = rows[i].firstChild.nextSibling.firstChild;
 		span.textContent = player.points.toString();
-		span.style.width = (player.points * 10) + "px";
+		span.style.width = (player.points * 5) + "px";
 	});
 	chart.setOption({series});
 	countdown = {message: "Choosing", value: data.countdown, limit: data.limit};
@@ -327,6 +327,7 @@ function resultRow(player, i) {
 		return {
 			score: -1,
 			element: create("div.score-row", {style: `top:${i * 38}px`},
+				create("span.position", "?. "),
 				create("span.name", player.name),
 				create("span.score", "")
 			)
@@ -335,8 +336,9 @@ function resultRow(player, i) {
 		return {
 			score: player.points,
 			element: create("div.score-row", {style: `top:${i * 38}px`},
+				create("span.position", "?. "),
 				create("span.name", player.name),
-				create("span.score", player.points.toString())
+				create("span.score", {style: `width: ${player.points * 2}px`}, player.points.toString())
 			)
 		};
 	}
@@ -350,7 +352,7 @@ events["round/scoring"] = function(data) {
 	data.players.forEach((player, i) => {
 		let span = rows[i].firstChild.nextSibling.firstChild;
 		span.textContent = player.points.toString();
-		span.style.width = (player.points * 10) + "px";
+		span.style.width = (player.points * 5) + "px";
 		series[i].name = player.name;
 	})
 	chart.setOption({series});
@@ -360,8 +362,15 @@ events["round/scoring"] = function(data) {
 	scoreDialog.showModal();
 	setTimeout(function() {
 		scores.sort((a, b) => b.score - a.score);
+		let previous = 1000000;
+		let position = 0;
 		scores.forEach((score, i) => {
 			score.element.style.top = i * 38 + "px";
+			if (score.score < previous) {
+				position = i + 1;
+				previous = score.score;
+			}
+			score.element.firstChild.textContent = `${position}. `;
 		});
 	}, 500);
 };
@@ -387,7 +396,7 @@ events["round/ending"] = function(data) {
 	data.players.forEach((player, i) => {
 		let span = rows[i].firstChild.nextSibling.firstChild;
 		span.textContent = player.points.toString();
-		span.style.width = (player.points * 10) + "px";
+		span.style.width = (player.points * 5) + "px";
 	})
 	let tbody = create("tbody");
 	while (scoreTable.firstChild) tbody.appendChild(scoreTable.firstChild);
