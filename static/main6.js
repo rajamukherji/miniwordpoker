@@ -201,7 +201,11 @@ events["game/join"] = function(data) {
 			choicesDiv.replaceChildren(choices.map((choice, index) => {
 				choice.index = index + 1;
 				if (choice.answer == data.answer) {
-					choice.element = create("div.choice.correct", choice.answer);
+					if (choice.answer == data.choice) {
+						choice.element = create("div.choice.actual.correct", choice.answer);
+					} else {
+						choice.element = create("div.choice.actual", choice.answer);
+					}
 				} else if (choice.answer == data.choice) {
 					choice.element = create("div.choice.incorrect", choice.answer);
 				} else {
@@ -360,7 +364,11 @@ events["round/marking"] = function(data) {
 	choicesDiv.replaceChildren(choices.map((choice, index) => {
 		choice.index = index + 1;
 		if (choice.answer == data.answer) {
-			choice.element = create("div.choice.correct", choice.answer);
+			if (choice.answer == data.choice) {
+				choice.element = create("div.choice.actual.correct", choice.answer);
+			} else {
+				choice.element = create("div.choice.actual", choice.answer);
+			}
 		} else if (choice.answer == data.choice) {
 			choice.element = create("div.choice.incorrect", choice.answer);
 		} else {

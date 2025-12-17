@@ -41,6 +41,7 @@
 			text-align: center;
 			width: 20em;
 			background: white;
+			position: relative;
 		}
 
 		.positive {
@@ -89,11 +90,19 @@
 			font-weight: bold;
 		}
 
-		.choice.correct {
+		.choice.actual {
 			border: 0.2em solid green;
 			outline: 6px green;
 			color: green;
 			font-weight: bold;
+		}
+
+		.choice.correct:after {
+			content: "✔";
+			font-size: 2em;
+			position: absolute;
+			left: 105%;
+			top: 0.1em;
 		}
 
 		.choice.incorrect {
@@ -101,6 +110,14 @@
 			outline: 6px red;
 			color: red;
 			font-weight: bold;
+		}
+		
+		.choice.incorrect:after {
+			content: "✗";
+			font-size: 2em;
+			position: absolute;
+			left: 105%;
+			top: 0.1em;
 		}
 
 		.choice.other {
