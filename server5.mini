@@ -5,8 +5,7 @@ import: soup("gir/Soup@3.0")
 import: json("fmt/json")
 import: uuid("util/uuid")
 import: game("game5")
-
-logger: log("main")
+logger: log("server")
 
 let Options := with Options := {
 	"Port" is 8081

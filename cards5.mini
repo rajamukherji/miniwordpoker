@@ -1,4 +1,5 @@
 import: dist("math/dist")
+logger: log("cards")
 
 export: def Cards := []
 
@@ -16,7 +17,7 @@ export: def AllResources := set(["Red", "Green", "Blue", "Orange"])
 
 :>-------------------------------------------------------------------------------<
 
-card: buy_resource(:points, :resource, weight is 20 - _, generate is; Player) do
+card: buy_resource(:points, :resource, weight is 25 - _, generate is; Player) do
 	let Game := Player:game
 	let Resource := random(AllResources)
 	let Price := math::ceil(Game:values[Resource] ^ 2 * 50 / (0.5 + (Player:random)()))
@@ -40,7 +41,7 @@ end
 
 :>-------------------------------------------------------------------------------<
 
-card: sell_resources(:resources, :points, weight is fun(Round) 4 * Round - 12 max 0, generate is; Player) do
+card: sell_resources(:resources, :points, weight is fun(Round) 4 * Round - 15 max 5, generate is; Player) do
 	let Game := Player:game
 	var Points := 0
 	let Costs := {}
@@ -143,7 +144,7 @@ end
 
 :>-------------------------------------------------------------------------------<
 
-card: delayed_buy_resource(:points, :resource, :delay, weight is fun(Round) (15 - Round) max 0, generate is; Player) do
+card: delayed_buy_resource(:points, :resource, :delay, weight is fun(Round) (15 - Round) max 5, generate is; Player) do
 	let Game := Player:game
 	Game:round < 19 or ret nil
 	let Resource := random(AllResources)
@@ -172,17 +173,17 @@ end
 
 :>-------------------------------------------------------------------------------<
 
-card: delayed_sell_resource(:resource, :points, :cost, :delay, weight is fun(Round) (15 - Round) max 0, generate is; Player) do
+card: delayed_sell_resource(:resource, :points, :price, :delay, weight is fun(Round) (15 - Round) max 5, generate is; Player) do
 	let Game := Player:game
-	Game:round < 19 or ret nil
+	Game:round < 18 or ret nil
 	var Points := 0
 	let Costs := {}
-	let Delay := random(2 .. (10 - Game:round))
+	let Delay := random(2 .. (20 - Game:round min 10))
 	for Resource in AllResources do
 		if random(real) < 0.4 then
-			let Max := Player:resources[Resource] + random(1 .. Delay) * random(1 .. Delay)
-			let Price := math::ceil(Game:values[Resource] ^ 2 * 100 / (1.5 - (Player:random)()) / math::sqrt(Delay))
-			let Amount := random(1 .. Max)
+			let Max := integer(random(1 .. Delay) ^ 1.5)
+			let Price := math::ceil(Game:values[Resource] ^ 2 * 200 / (1.5 - (Player:random)()))
+			let Amount := Player:resources[Resource] + random(1 .. Max)
 			Points := old + (Amount * Price)
 			Costs[Resource] := Amount
 		end
@@ -194,17 +195,22 @@ end
 
 meth :name(Card: delayed_sell_resource) 'Sell {first(key(Card:resource))} in {Card:delay}'
 meth :image(Card: delayed_sell_resource) 'card2-10'
-meth :description(Card: delayed_sell_resource) 'Sell {resources_string(Card:resource)} for {Card:points} points after {Card:delay} rounds.'
-meth :cost(Card: delayed_sell_resource) '{Card:cost} points'
+meth :description(Card: delayed_sell_resource) 'Sell {resources_string(Card:resource)} for {Card:points} points after {Card:delay} rounds. Failure costs {Card:points / 10} points.'
+meth :cost(Card: delayed_sell_resource) '{Card:price} points'
 meth :apply(Card: delayed_sell_resource, Player: any) do
+	for Resource, Amount in Card:resource do
+		Player:targets[Resource]:inc(Amount)
+	end
 	Player:invest(Card:delay;) do
 		let Missing := set()
 		for Resource, Amount in Card:resource do
+			Player:targets[Resource]:dec(Amount)
 			if Player:resources[Resource] < Amount then
 				Missing:insert(Resource)
 			end
 		end
 		if Missing:count > 0 then
+			Player:points := old - (Card:price / 10)
 			ret '{Player:name} does not have enough {Missing, ", "} to complete their promise.'
 		end
 		for Resource, Amount in Card:resource do
@@ -213,6 +219,142 @@ meth :apply(Card: delayed_sell_resource, Player: any) do
 		Player:points := old + Card:points
 		ret '{Player:name} sold {resources_string(Card:resource)} for {Card:points} points.'
 	end
-	Player:points := old - Card:cost
-	ret '{Player:name} paid {Card:cost} points for a promise to sell {resources_string(Card:resource)} for {Card:points} in {Card:delay} rounds.'
+	Player:points := old - Card:price
+	ret '{Player:name} paid {Card:price} points for a promise to sell {resources_string(Card:resource)} for {Card:points} in {Card:delay} rounds.'
+end
+
+:>-------------------------------------------------------------------------------<
+
+card: steal_points(:target, :percent, :price, weight is fun 10, generate is; Player) do
+	let Game := Player:game
+	let Target := if random(boolean) = true then
+		let Others := set(Game:players, Player != _)
+		random(Others) or ret nil
+	else
+		let Targets := ["Points"]:grow(key(Player:resources))
+		random(Targets)
+	end
+	let Percent := random(1 .. 10) * 5
+	let Cost := math::ceil(Player:points * Percent / (100 * (Player::random)() + 50))
+	ret steal_points(Target, Percent, Cost)
+end
+
+meth :name(Card: steal_points) 'Steal {Card:percent}%'
+meth :image(Card: steal_points) 'card4-04'
+meth :description(Card: steal_points) do
+	let Target := Card:target
+	if Target in string then
+		'Steal {Card:percent}% points from player with most {Target}.'
+	else
+		'Steal {Card:percent}% points from {Target:name}.'
+	end
+end
+meth :cost(Card: steal_points) '{Card:price} points'
+meth :apply(Card: steal_points, Player: any) do
+	let Target := Card:target
+	let Other := if Target in string then
+		let Players := Player:game:players
+		if Target = "Points" then
+			max2(dup(Players) -> :points)[1]
+		else
+			max2(dup(Players) -> :resources -> _[Target])[1]
+		end
+	else
+		Target
+	end
+	Player:points := old - Card:price
+	Other = Player and ret '{Player:name} tried to steal from themselves! It wasn\'t very effective.'
+	if Other:effects["protection"] > 0 then
+		ret '{Player:name} tried to steal from {Other:name} but they had protection.'
+	end
+	let Amount := math::floor(Card:percent * Other:points / 100)
+	Other:points := old - Amount
+	Player:points := old + Amount
+	ret '{Player:name} stole {Amount} points from {Other:name}.'
+end
+
+:>-------------------------------------------------------------------------------<
+
+card: prevent_steal(:rounds, :price, weight is fun 10, generate is; Player) do
+	let Rounds := random(1 .. 5)
+	let Cost := math::ceil(Player:points * (10 + Rounds) / (100 * (Player::random)() + 50))
+	ret prevent_steal(Rounds, Cost)
+end
+
+meth :name(Card: prevent_steal) 'Protection'
+meth :image(Card: prevent_steal) 'card4-06'
+meth :description(Card: prevent_steal) 'Prevent negative effects for the next {Card:rounds} rounds.'
+meth :cost(Card: prevent_steal) '{Card:price} points'
+meth :apply(Card: prevent_steal, Player: any) do
+	Player:points := old - Card:price
+	Player:effects["protection", fun 0] := old max Card:rounds
+	ret '{Player:name} paid {Card:price} points for {Card:rounds} of protection.'
+end
+
+:>-------------------------------------------------------------------------------<
+
+card: confusion(:price, :target, weight is fun 5, generate is; Player) do
+	let Game := Player:game
+	let Others := set(Game:players, Player != _)
+	let Target := random(Others) or ret nil
+	let Cost := math::ceil(Player:points * 5 / (100 * (Player::random)() + 50))
+	ret confusion(Cost, Target)
+end
+
+meth :name(Card: confusion) 'Cast Confusion'
+meth :image(Card: confusion) 'card1-07'
+meth :description(Card: confusion) 'Cast confusion on {Card:target:name} for the next 1 round.'
+meth :cost(Card: confusion) '{Card:price} points'
+meth :apply(Card: confusion, Player: any) do
+	let Other := Card:target
+	Player:points := old - Card:price
+	if Other:effects["protection"] > 0 then
+		ret '{Player:name} tried to confuse {Other:name} but they had protection.'
+	end
+	Other:effects["confusion"] := 1
+	ret '{Player:name} paid {Card:price} points to cast confusion on {Other:name}.'
+end
+
+:>-------------------------------------------------------------------------------<
+
+card: convert_resource(:price, :resource, weight is fun 10, generate is; Player) do
+	let (Resource, Target) := max2(Player:targets)
+	Target > 0 or ret nil
+	let Cost := math::ceil(Player:points * random(1 .. 10) / 10)
+	ret convert_resource(Cost, Resource)
+end
+
+meth :name(Card: convert_resource) 'Convert Resources'
+meth :image(Card: convert_resource) 'card1-02'
+meth :description(Card: convert_resource) 'Convert all of your resources to {Card:resource}.'
+meth :cost(Card: convert_resource) '{Card:price} points'
+meth :apply(Card: convert_resource, Player: any) do
+	Player:points := old - Card:price
+	let Total := sum(Player:resources)
+	for Amount in Player:resources do Amount := 0 end
+	Player:resources[Card:resource] := Total
+	ret '{Player:name} paid {Card:price} points to convert all of their resources to {Card:resource}.'
+end
+
+:>-------------------------------------------------------------------------------<
+
+card: shuffle_resources(:price, weight is fun 5, generate is; Player) do
+	let Cost := math::ceil(Player:points * random(1 .. 10) / 10)
+	ret shuffle_resources(Cost)
+end
+
+meth :name(Card: shuffle_resources) 'Shuffle Resources'
+meth :image(Card: shuffle_resources) 'card4-22'
+meth :description(Card: shuffle_resources) 'Shuffles everyones resources.'
+meth :cost(Card: shuffle_resources) '{Card:price} points'
+meth :apply(Card: shuffle_resources, Player: any) do
+	Player:points := old - Card:price
+	let Game := Player:game
+	let Resources := list(key(Game:values))
+	for Player in Game:players do
+		let Total := sum(Player:resources)
+		for Amount in Player:resources do Amount := 0 end
+		Player:resources grow count2(1 .. Total;) random(Resources)
+	end
+	ret '{Player:name} paid {Card:price} points to shuffle everyone\'s resources.'
 end

@@ -5,7 +5,7 @@ import: uuid("util/uuid")
 import: stat("math/stat")
 import: dist("math/dist")
 import: cards("cards5")
-logger: log("main")
+logger: log("game")
 
 :<
 import: game("game")
@@ -36,7 +36,7 @@ export: class: game(
 )
 
 export: class: player(:name, :callback, :game, :history, :points, :resources,
-	:choices, :choice, :investments, :effects, :luck, :random,
+	:choices, :choice, :investments, :effects, :luck, :random, :targets,
 	init is fun(Player, Name, Callback) do
 		Player:name := Name
 		Player:callback := Callback or fun(Player, Event, Data) do
@@ -122,7 +122,7 @@ end
 fun random_card(Player, choice) do
 	for I in 1 .. 50 do
 		let Class := cards::Cards[choice()]
-		print('Attempting to generate {Class}\n')
+		log::info('Attempting to generate ', Class)
 		if let Card := Class::generate(Player) then
 			ret Card
 		end
@@ -151,6 +151,7 @@ glib::timeout_add(0, 1000;) do
 					Player:choices := []
 					Player:choice := nil
 					Player:investments := []
+					Player:targets := map(cards::AllResources;) 0
 					Player:effects := {}
 					Player:luck := 0.5
 					Player:random := dist::triangular(0.0, 0.5, 1.0)
@@ -175,10 +176,11 @@ glib::timeout_add(0, 1000;) do
 					end
 				end
 				Game:events:empty
-				if let Round := 10 >= Game:round then
+				if let Round := 20 >= Game:round then
 					Game:mult := random(real) / 5
 					State := game::state::Choosing
 					Countdown := Game:limit := 10
+					log::info('Card weights = ', map(cards::Cards, ::weight, _(Round)))
 					let choice := random::choice ! list(cards::Cards; Card) Card::weight(Round)
 					for Index, Player in Players do
 						Player:choices := list(1 .. 6;) random_card(Player, choice)
@@ -189,7 +191,7 @@ glib::timeout_add(0, 1000;) do
 							"description" is Choice:description,
 							"cost" is Choice:cost
 						}
-						Player:effects["confused"] and Choices:shuffle
+						Player:effects["confusion"] and Choices:shuffle
 						Player:emit("round/choosing", {
 							"countdown" is Countdown, "limit" is Game:limit,
 							"points" is Player:points, "resources" is Player:resources,
@@ -218,9 +220,6 @@ glib::timeout_add(0, 1000;) do
 					end
 				end
 			case "Choosing" do
-				for Player in Players do
-					Player:effects:delete("confused")
-				end
 				let Log := []
 				for Event in Game:events do
 					Log:put(Event(){})
@@ -229,6 +228,12 @@ glib::timeout_add(0, 1000;) do
 					if let Choice := Player:choice then
 						Log:put(Choice:apply(Player))
 					end
+				end
+				for Player in Players do
+					for Value in Player:effects do
+						Value:dec
+					end
+					Player:effects:filter(_ > 0)
 				end
 				State := game::state::Running
 				Countdown := Game:limit := 10
