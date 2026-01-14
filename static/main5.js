@@ -282,7 +282,7 @@ events["round/choosing"] = function(data) {
 		name.innerHTML = choice.name;
 		let description = create("div.description");
 		description.innerHTML = choice.description;
-		choice.element = create("div.choice",
+		choice.element = create("div.choice", {style: `background: ${choice.colour}`},
 			name,
 			create("img.image", {src: `/cards2/${choice.image}.png`}),
 			description,
