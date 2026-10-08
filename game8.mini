@@ -1,0 +1,222 @@
+import: glib("gir/GLib")
+import: gobject("gir/GObject")
+import: json("fmt/json")
+import: uuid("util/uuid")
+logger: log("main")
+
+:<
+import: game("game")
+let Game := game::game("Test")
+let P1 := game::player("Ann")
+let P2 := game::player("Bob")
+let P3 := game::player("Cat")
+let P4 := game::player("Dan")
+P1 join Game
+P2 join Game
+Game:start
+>:
+
+random::seed(time():nsec)
+
+let Dictionary := {}
+
+with File := file('{import}/scrabble_vocab.txt', "r") do
+	loop
+		let Word := (while File:read):trim:lower
+		do
+			Dictionary[Word] := count2(Word)
+		on Error do
+			log::warn('Skipping word', Word)
+		end
+	end
+	File:close
+end
+
+log::info("Loaded ", count(Dictionary), " words")
+
+export: class: game(
+	:name, :owner, :password, :state,
+	:initpoints, :round, :players, :countdown,
+	:limit, :history, :board, :best,
+	
+	state is enum("Initial", "Starting", "Playing", "Scoring", "Ending"),
+	init is fun(Game, Name, Owner, Password) do
+		Game:name := Name
+		Game:owner := Owner
+		Game:password := Password
+		Game:state := game::state::Initial
+		Game:initpoints := 0
+		Game:round := 0
+		Game:players := []
+		Game:history := []
+	end
+)
+
+export: class: player(:name, :callback, :game, :points, :swap, :word, :score, :best,
+	init is fun(Player, Name, Callback) do
+		Player:name := Name
+		Player:callback := Callback or fun(Player, Event, Data) do
+			print(Event, " ", Data, "\n")
+		end
+	end
+)
+
+meth :emit(Player: player, [Args]) do
+	Player:callback ! [Player]:grow(Args)
+end
+
+meth :state(Player: player) do
+	if let Game := Player:game then
+		ret {
+			"name" is Game:name, "state" is string(Game:state),
+			"countdown" is Game:countdown, "limit" is Game:limit,
+			"points" is Player:points, "swap" is Player:swap,
+			"word" is Player:word, "score" is Player:score,
+			"owner" is Game:owner = Player and true,
+			"players" is list(Game:players; Other) {
+				"name" is Other:name, "points" is Other:points,
+				"self" is Other = Player and true
+			}
+		}
+	end
+end
+
+meth :join(Player: player, Game: game) do
+	Player:game and error("StateError", "Player already in game")
+	Player:game := Game
+	Player:points := Game:initpoints
+	Player:score := 0
+	Player:word := ""
+	for Other in Game:players do
+		Other:emit("game/join", {"name" is Player:name, "points" is Player:points})
+	end
+	Game:players:put(Player)
+	ret Player:state
+end
+
+let Games := []
+
+meth :start(Player: player, Game: game) do
+	Game:state = game::state::Initial or error("StateError", "Invalid state")
+	Game:owner = Player or error("StateError", "Invalid owner")
+	Game:state := game::state::Starting
+	Game:countdown := Game:limit := 3
+	for Player in Game:players do
+		Player:points := Game:initpoints
+		Player:emit("round/starting", {
+			"countdown" is Game:countdown, "limit" is Game:limit
+		})
+	end
+	Games:put(Game)
+end
+
+meth :leave(Player: player, Game: game) do
+	Game = Player:game or error("StateError", "Player not in game")
+	Player:game := nil
+	let Players := Game:players
+	let Index := Players:find(Player)
+	Players:delete(Index)
+	Player:emit("game/leave", {})
+	for Player in Game:players do
+		Player:emit("game/leave", {"player" is Index})
+	end
+	if Players:length = 0 then
+		Games:filter(_ != Game)
+	end
+end
+
+fun check_word(Word, Board) do
+	let Counts := Dictionary[Word] or ret nil
+	let (Unused, Used, Extra) := Board <=> Counts
+	ret (sum(Used) or 0) - (sum(Extra) or 0)
+end
+
+meth :word(Player: player, Word: string) do
+	Player:game:state != game::state::Playing and error("StateError", "Invalid state")
+	let Score := check_word(Word, Player:game:board)
+	if Score > Player:score then
+		Player:score := Score
+		Player:word := Word
+	end
+	ret {"word" is Word, "score" is Score, "bestWord" is Player:word, "bestScore" is Player:score}
+end
+
+fun best_word(Board) do
+	ret {"word" is "banana", "score" is 10}
+end
+
+let Letters := list("a" .. "z")
+
+glib::timeout_add(0, 1000;) do
+	for Game in Games do
+		ref Countdown := Game:countdown
+		if Countdown and Countdown:dec = 0 then
+			ref State := Game:state
+			let Players := Game:players
+			switch State: game::state
+			case "Starting" do
+				Game:round:inc
+				let Board := Game:board := map(swap(Letters:shuffle limit 9), _ + 1, _ div 2)
+				State := game::state::Playing
+				Countdown := Game:limit := 60
+				for Player in Players do
+					Player:score := 0
+					Player:word := ""
+					Player:emit("round/playing", {
+						"countdown" is Countdown, "limit" is Game:limit,
+						"board" is Board,
+						"points" is Player:points,
+						"word" is Player:word, "score" is Player:score
+					})
+				end
+				task(;) do
+					let (Word, Score) := max2(Dictionary; Counts) do
+						let (Unused, Used, Extra) := Board <=> Counts
+						ret (sum(Used) or 0) - (sum(Extra) or 0)
+					end
+					Game:best := {"word" is Word, "score" is Score}
+				end
+			case "Playing" do
+				State := game::state::Scoring
+				Countdown := Game:limit := Players:count + 2
+				let Best := Game:best
+				let MaxScore := max(Players, :score)
+				for Player in Players do
+					Player:points := old + Player:score{}
+				end
+				let Results := list(Players; Player) {
+					"name" is Player:name,
+					"word" is Player:word, "score" is Player:score,
+					"points" is Player:points, "best" is Best
+				}
+				Game:history:put(Results)
+				for Player in Players do
+					Player:emit("round/scoring", {
+						"countdown" is Countdown, "limit" is Game:limit,
+						"round" is Game:round, "players" is Results
+					})
+				end
+			case "Scoring" do
+				State := game::state::Ending
+				Countdown := Game:limit := 1
+				for Player in Players do
+					Player:emit("round/ending", {
+						"countdown" is Countdown, "limit" is Game:limit,
+						"players" is list(Players; Player) {"points" is Player:points}
+					})
+				end
+			case "Ending" do
+				State := game::state::Starting
+				Countdown := Game:limit := 3
+				for Player in Players do
+					Player:emit("round/starting", {
+						"countdown" is Countdown,  "limit" is Game:limit
+					})
+				end
+			end
+		end
+	on Error do
+		log::error(Error)
+	end
+	ret true
+end
