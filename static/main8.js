@@ -198,6 +198,18 @@ function scoreWord(word) {
 	}
 }
 
+function updateGameBoard(word) {
+	let children2 = gameBoard.children;
+	for (let i = 0; i < children2.length; ++i) {
+		let child = children2[i];
+		if (word.indexOf(child.getAttribute("letter")) >= 0) {
+			child.addClass("used");
+		} else {
+			child.removeClass("used");
+		}
+	}
+}
+
 document.onkeydown = function(event) {
 	let letter = event.key;
 	if (letter === "Backspace" || letter === "Delete") {
@@ -206,13 +218,16 @@ document.onkeydown = function(event) {
 			let children = wordBoard.children;
 			let word = "";
 			for (let i = 0; i < children.length; ++i) word += children[i].getAttribute("letter");
+			updateGameBoard(word);
 			scoreWord(word);
 		}
 	} else if (letter === "Escape") {
 		wordBoard.removeChildren();
+		updateGameBoard("");
 		scoreWord("");
 	} else if (gameState == "swapping" && wordBoard.children.length >= 3) {
-	} else {
+	} else if (letter.length === 1) {
+		letter = letter.toLowerCase();
 		let copy = Object.assign({}, gameLetters);
 		let children = wordBoard.children;
 		let word = "";
@@ -228,6 +243,7 @@ document.onkeydown = function(event) {
 			create("span.score", score.toString())
 		));
 		word += letter;
+		updateGameBoard(word);
 		scoreWord(word);
 	}
 }

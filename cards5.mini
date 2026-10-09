@@ -103,6 +103,7 @@ card: worsen_resource(:points, :resource, :amount, weight is fun 3, exclusive is
 		if Current >= N then
 			let Amount := math::round(random(real), 5)
 			Amount < Game:values[Resource] or next
+			Amount > 0 or next
 			ret worsen_resource(Points, Resource, Amount)
 		end
 		N := old - Current
